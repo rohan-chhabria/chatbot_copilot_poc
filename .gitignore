@@ -22,6 +22,7 @@ venv/
 *.db
 *.sqlite3
 chroma_db/
+chroma_docs/
 
 .aws-sam/
 samconfig.toml.bak

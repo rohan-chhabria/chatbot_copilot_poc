@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "user_id": "Richard.Bell",
+      "display_name": "Richard Bell",
+      "customer_key": "demo",
+      "role": "officer",
+      "facility_ids": [63, 164, 182],
+      "avatar": "RB"
+    },
+    {
+      "user_id": "Anks",
+      "display_name": "Ankush",
+      "customer_key": "demo",
+      "role": "officer",
+      "facility_ids": [63, 164],
+      "avatar": "AK"
+    },
+    {
+      "user_id": "Mark.Kent",
+      "display_name": "Mark Kent",
+      "customer_key": "demo",
+      "role": "warden",
+      "facility_ids": [63, 164, 182, 166, 167, 64, 65, 66, 181],
+      "avatar": "MK"
+    },
+    {
+      "user_id": "Bill.Allen",
+      "display_name": "Bill Allen",
+      "customer_key": "demo",
+      "role": "officer",
+      "facility_ids": [166, 167],
+      "avatar": "BA"
+    }
+  ],
+  "default_customer_key": "demo",
+  "default_facility_ids": [63, 164, 182, 166, 167, 64, 65, 66, 181]
+}

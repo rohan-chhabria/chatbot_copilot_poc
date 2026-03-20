@@ -1,0 +1,662 @@
+{
+  "timestamp": "2026-03-16T08:42:37.987844",
+  "summary": {
+    "total": 58,
+    "passed": 58,
+    "success_rate": 100.0,
+    "avg_latency_ms": 2778,
+    "total_time_s": 161.1
+  },
+  "conversations": [
+    {
+      "name": "Warden Morning Briefing",
+      "persona": "warden",
+      "total_ms": 20812,
+      "turns": [
+        {
+          "question": "good morning sarah",
+          "tag": "greeting",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 9,
+          "summary": "Hello Warden Mark Kent, I'm Sarah \u2014 your Inmate Intelligence assistant. I can help you search notes, track inmates, check compliance, and more. What can I help you with?",
+          "error": ""
+        },
+        {
+          "question": "how many notes were added yesterday",
+          "tag": "analytics",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 4275,
+          "summary": "Note Count: 288",
+          "error": ""
+        },
+        {
+          "question": "who were the top 5 officers by note count this month",
+          "tag": "ranked_officers",
+          "success": true,
+          "check_passed": true,
+          "row_count": 5,
+          "elapsed_ms": 3211,
+          "summary": "**5 results** (402 total)\n\n  1. ankush new \u2014 **180** \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n  2. Utpal Dutta \u2014 **70** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  3. Matthew Curran \u2014 **67** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  4. Mark Kent \u2014 **60** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  5. Muzzammil Khan \u2014 **25** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n\n\ud83d\udca1 Ask: \"Show notes by [officer name] this week\"",
+          "error": ""
+        },
+        {
+          "question": "any red flagged entries in the last 30 days",
+          "tag": "red_highlight",
+          "success": true,
+          "check_passed": true,
+          "row_count": 8,
+          "elapsed_ms": 4047,
+          "summary": "**8 notes** (Mar 06 to Mar 12)\n\nBy: ankush (5), Bill (2), Utpal (1)\n\n  2026-03-12T12:12 I'm not going to type it cuz I hate typing so again this is no magic this is just saying hey everyth\n  2026-03-11T13:23 Incident | Location - Yard | Comments - Fight | ANTHONY, NOVA | 1D | BK#: P01112850 Bould, H",
+          "error": ""
+        },
+        {
+          "question": "what about fire watch compliance this week",
+          "tag": "keyword_firewatch",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 4042,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "show me all inmate movements in the last 7 days",
+          "tag": "movement",
+          "success": true,
+          "check_passed": true,
+          "row_count": 3,
+          "elapsed_ms": 5220,
+          "summary": "**3 movements** recorded:\n\n  **Kendra Barnes** \u2014 C-POD Rm 1423 \u2192 Kitchen Rm ? (2026-03-11)\n  **Green  Bean** \u2014 4F DEMO and Training Rm 99 \u2192 A-POD Rm 1406 (2026-03-11)\n  **Nova Anthony** \u2014 01-Facility Master Rm ? \u2192 Kitchen Rm 1526 (2026-03-12)",
+          "error": ""
+        },
+        {
+          "question": "what did I ask you so far",
+          "tag": "history_recall",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "Here's what you've asked so far in this session:\n\n  1. good morning sarah\n  2. how many notes were added yesterday\n  3. who were the top 5 officers by note count this month\n  4. any red flagged entries in the last 30 days\n  5. what about fire watch compliance this week\n  6. show me all inmate moveme",
+          "error": ""
+        },
+        {
+          "question": "thanks sarah, talk later",
+          "tag": "farewell",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "Glad I could help, Mark Kent! Stay safe out there. \ud83d\udc4b",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Officer Inmate Investigation",
+      "persona": "officer_broad",
+      "total_ms": 15151,
+      "turns": [
+        {
+          "question": "hey",
+          "tag": "greeting",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "Hello Officer Richard Bell, I'm Sarah \u2014 your Inmate Intelligence assistant. I can help you search notes, track inmates, check compliance, and more. What can I help you with?",
+          "error": ""
+        },
+        {
+          "question": "where is inmate anthony nova right now",
+          "tag": "inmate_location",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 3845,
+          "summary": "**1 inmate** found:\n\n  **Nova Anthony** \u2014 01-Facility Master \u00b7 Work Detail\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        },
+        {
+          "question": "show me last 5 status changes for this inmate",
+          "tag": "status_change_followup",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3415,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "any movement history for anthony nova",
+          "tag": "movement_specific",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "I couldn't find data matching that question. Could you rephrase it with more detail about what you're looking for?",
+          "error": ""
+        },
+        {
+          "question": "show all entries for inmate anthony nova added this month",
+          "tag": "entries_for_inmate",
+          "success": true,
+          "check_passed": true,
+          "row_count": 170,
+          "elapsed_ms": 4851,
+          "summary": "**170 notes** (Feb 16 to Mar 12)\n\nBy: Mark (85), ankush (20), Muzzammil (11)\n\n  2026-03-11T16:19 NFC Round Facility | \nInmate(s)\nANTHONY NOVA | 2110739 | 01-Facility Master | \nFollows directions an\n  2026-03-12T12:33 NFC Round Facility | \nInmate(s)\nANTHONY NOVA | 2110739 | 01-Facility Master | \nInte",
+          "error": ""
+        },
+        {
+          "question": "where is inmate heath bould",
+          "tag": "inmate_location_2",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 3034,
+          "summary": "**1 inmate** found:\n\n  **Heath Bould** \u2014 01-Facility Master \u00b7 In the Cell\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Officer Daily Rounds",
+      "persona": "officer_narrow",
+      "total_ms": 15062,
+      "turns": [
+        {
+          "question": "hi sarah, what can you help me with",
+          "tag": "capability",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "Hello Officer Anks, I'm Sarah \u2014 your Inmate Intelligence assistant. I can help you search notes, track inmates, check compliance, and more. What can I help you with?",
+          "error": ""
+        },
+        {
+          "question": "when was the last round conducted",
+          "tag": "round_check",
+          "success": true,
+          "check_passed": true,
+          "row_count": 57,
+          "elapsed_ms": 3195,
+          "summary": "**57 notes** (Feb 16 to Mar 12)\n\n\n  2026-03-12T12:33 NFC Round Facility | \nInmate(s)\nANTHONY NOVA | 2110739 | 01-Facility Master | \nInteracting with othe\n  2026-03-12T12:28 Security Rounds | \n30 Mins\nUse of Force | \nRestraints\nOC Spray\n | BARBER, KAHILAH -  C10 - BK#: P009\n  2026-03-12T11:13 NFC Rou",
+          "error": ""
+        },
+        {
+          "question": "show me all meal related entries today",
+          "tag": "meal_entries",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3598,
+          "summary": "No results found. Try a wider date range (e.g., last 7 days).\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "any suicide watch notes this week",
+          "tag": "suicide_watch",
+          "success": true,
+          "check_passed": true,
+          "row_count": 12,
+          "elapsed_ms": 4855,
+          "summary": "**12 notes** (Mar 11)\n\n\n  2026-03-11T14:44 Suicide Watch | 03:00 PM | The inmate has been put on Suicide Watch and must be monitored at regular\n  2026-03-11T14:44 SUICIDE WATCH | ENDED | 03:00 PM  Adams, Wakesha -  Test-room1 - BK#: \n  2026-03-11T14:10 Suicide Watch | 02:25 PM | The inmate has been ",
+          "error": ""
+        },
+        {
+          "question": "show security rounds for today",
+          "tag": "security_rounds",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3407,
+          "summary": "No results found. Try a wider date range (e.g., last 7 days).\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "who am I logged in as",
+          "tag": "self_identity",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "You're **Anks**, logged in as **Officer**.\nFacility access: 63, 164\nSession: daf98545... | Questions asked: 5\n\nI use your profile to scope queries to your facilities and track our conversation.",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Status & Movement Analysis",
+      "persona": "warden",
+      "total_ms": 14186,
+      "turns": [
+        {
+          "question": "list all inmates with current status and facility",
+          "tag": "all_inmates_status",
+          "success": true,
+          "check_passed": true,
+          "row_count": 500,
+          "elapsed_ms": 2011,
+          "summary": "**500 status changes:**\n\n  AJohn JasonB \u2014 **In the Cell**\n  Aroy Martinb \u2014 **In the Cell**\n  Aalbert Holmesb \u2014 **In the Cell**\n  Arobert Jordanb \u2014 **In the Cell**\n  Ajoseph Silvestrib \u2014 **In the Cell**\n  Ajohn Deemerb \u2014 **In the Cell**\n  Aalvin Singerb \u2014 **In the Cell**\n  Akenneth Tittleb \u2014 **In the",
+          "error": ""
+        },
+        {
+          "question": "find inmates currently in meal status",
+          "tag": "status_filter_meal",
+          "success": true,
+          "check_passed": true,
+          "row_count": 2,
+          "elapsed_ms": 2561,
+          "summary": "**2 inmates** found:\n\n  **Clifton Allen** \u2014 01-Facility Master \u00b7 Rm 1138 \u00b7 Meal\n  **Troyman Broussard** \u2014 3B \u00b7 Rm 346 \u00b7 Meal\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        },
+        {
+          "question": "show inmates in recreation status",
+          "tag": "status_filter_recreation",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 2486,
+          "summary": "**1 status change:**\n\n  Charconta Arnold \u2014 **Recreation**\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        },
+        {
+          "question": "inmate movement in last 7 days",
+          "tag": "movement_7d",
+          "success": true,
+          "check_passed": true,
+          "row_count": 3,
+          "elapsed_ms": 3861,
+          "summary": "**3 movements** recorded:\n\n  **Nova Anthony** \u2014 01-Facility Master Rm ? \u2192 Kitchen Rm 1526 (2026-03-12)\n  **Green  Bean** \u2014 4F DEMO and Training Rm 99 \u2192 A-POD Rm 1406 (2026-03-11)\n  **Kendra Barnes** \u2014 C-POD Rm 1423 \u2192 Kitchen Rm ? (2026-03-11)",
+          "error": ""
+        },
+        {
+          "question": "movement history for inmate Anthony Nova",
+          "tag": "movement_specific_inmate",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "I couldn't find data matching that question. Could you rephrase it with more detail about what you're looking for?",
+          "error": ""
+        },
+        {
+          "question": "list all movements this month",
+          "tag": "movement_monthly",
+          "success": true,
+          "check_passed": true,
+          "row_count": 13,
+          "elapsed_ms": 3261,
+          "summary": "**13 movements** recorded:\n\n  **Charconta Arnold** \u2014 A-POD Rm 1423 \u2192 Kitchen Rm 1526 (2026-02-16)\n  **Glen Smallwood** \u2014 Facility - 2 Rm ? \u2192 4F DEMO and Training Rm 29216 (2026-02-16)\n  **Nick Barge** \u2014 01-Facility Master Rm 1489 \u2192 Visitation Rm ? (2026-02-16)\n  **Fredia Adams** \u2014 Facility - 1 Rm 81",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Keyword Deep Search",
+      "persona": "officer_broad",
+      "total_ms": 24771,
+      "turns": [
+        {
+          "question": "show notes about elevated supervision in last 90 days",
+          "tag": "multiword_elevated_supervision",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 5306,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "any cell inspection entries in the last month",
+          "tag": "multiword_cell_inspection",
+          "success": true,
+          "check_passed": true,
+          "row_count": 6,
+          "elapsed_ms": 5762,
+          "summary": "**6 notes** (Feb 16 to Mar 11)\n\n\n  2026-02-25T08:56 Cell Inspection | ANTHONY, NOVA | 1D | BK#: P01112850\n  2026-02-16T07:20 Cell Inspection | Comments - excessive trash\nAmbient Weather | Maintenance Request | Faucets/Toilets\n  2026-02-23T07:57 Cell Inspection | Cleaned\nNo debris or excess food obse",
+          "error": ""
+        },
+        {
+          "question": "fire watch notes this week",
+          "tag": "multiword_firewatch",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 4435,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "retrieve lockdown records in last 90 days",
+          "tag": "multiword_lockdown",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3195,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "all disciplinary notes this month",
+          "tag": "keyword_disciplinary",
+          "success": true,
+          "check_passed": true,
+          "row_count": 8,
+          "elapsed_ms": 2830,
+          "summary": "**8 notes** (Mar 06 to Mar 11)\n\n\n  2026-03-11T13:32 NELSON, KIRK -   - BK#: 1086295 status updated In the Cell to Disciplinary Hearing\n  2026-03-06T05:51  | Disciplinary Report has been added  | case number 23-00004 Chamberlain, Kaislee -  Room3-bar - BK\n  2026-03-06T05:52 Case Cover Page update wit",
+          "error": ""
+        },
+        {
+          "question": "find emergency notes in last 24 hours",
+          "tag": "keyword_emergency",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3240,
+          "summary": "No results found. Try a wider date range (e.g., last 7 days).\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Time-Based Lookups",
+      "persona": "warden",
+      "total_ms": 16993,
+      "turns": [
+        {
+          "question": "entries added in the last 48 hours",
+          "tag": "time_48h",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 7087,
+          "summary": "No results found. Try a wider date range (e.g., last 7 days).\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "show notes from yesterday",
+          "tag": "time_yesterday",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3457,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "when was the first note added today",
+          "tag": "time_first_today",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 2053,
+          "summary": "**1 record** found:\n\n  Mar 16, 2026 12:01 AM\n\n\ud83d\udca1 Ask: \"Compare with yesterday's data\"",
+          "error": ""
+        },
+        {
+          "question": "what time was the last note added yesterday",
+          "tag": "time_last_yesterday",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2074,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "daily note count for last 30 days",
+          "tag": "time_daily_trend",
+          "success": true,
+          "check_passed": true,
+          "row_count": 500,
+          "elapsed_ms": 2319,
+          "summary": "**500 notes** (Feb 16 to Mar 02)\n\n\n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n  2026-02-16 \n\n  ... and 490 more entries\n\n\ud83d\udca1 Ask: \"Narrow down by keyword or officer\"",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Analytics Dashboard",
+      "persona": "warden",
+      "total_ms": 12932,
+      "turns": [
+        {
+          "question": "how many notes were added today",
+          "tag": "count_today",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 1637,
+          "summary": "Note Count: 57\n\n\ud83d\udca1 Ask: \"Compare with yesterday's data\"",
+          "error": ""
+        },
+        {
+          "question": "count total notes added this year",
+          "tag": "count_yearly",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 2506,
+          "summary": "Total Notes Added This Year: 2,658",
+          "error": ""
+        },
+        {
+          "question": "top 10 officers by notes this month",
+          "tag": "top_officers_month",
+          "success": true,
+          "check_passed": true,
+          "row_count": 10,
+          "elapsed_ms": 3254,
+          "summary": "**10 results** (460 total)\n\n  1. ankush new \u2014 **180** \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n  2. Utpal Dutta \u2014 **70** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  3. Matthew Curran \u2014 **67** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  4. Mark Kent \u2014 **60** \u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\n  5. Muzzammil Khan \u2014 **25** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  6. Karry Guptill \u2014 **21** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  7. Robin George \u2014 **14** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  8. Rajesh Rana \u2014 *",
+          "error": ""
+        },
+        {
+          "question": "count notes per facility",
+          "tag": "count_per_facility",
+          "success": true,
+          "check_passed": true,
+          "row_count": 9,
+          "elapsed_ms": 1955,
+          "summary": "**9 results** (1,769 total)\n\n  1. 63 \u2014 **1,556** \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\n  2. 64 \u2014 **46** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  3. 164 \u2014 **29** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  4. 166 \u2014 **18** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  5. 65 \u2014 **8** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  6. 66 \u2014 **3** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  7. 181 \u2014 **101** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  8. 182 \u2014 **6** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\n  9. 167 \u2014 **2** \u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591",
+          "error": ""
+        },
+        {
+          "question": "how many inmates are in cell 49",
+          "tag": "count_cell",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 1271,
+          "summary": "Inmate Count: 1\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        },
+        {
+          "question": "what active keywords were used last week",
+          "tag": "active_keywords",
+          "success": true,
+          "check_passed": true,
+          "row_count": 48,
+          "elapsed_ms": 2305,
+          "summary": "**48 records** found:\n\n  Security Rounds |\n  Special Housing Staff\n  Special Housing Inspection\n  Daily Emails |\n  Post Acceptance |\n  Meals |\n  Keys, Tools, and Equipment |\n  Supervisor Daily Walk-through | \n  Use of Force |\n  Legal Mail |\n  Incident |\n  Visitor Log |\n  Fire Watch |\n  Medical Emerg",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Officer & Visitor Logs",
+      "persona": "warden",
+      "total_ms": 15483,
+      "turns": [
+        {
+          "question": "show notes created by officer Anks today",
+          "tag": "officer_specific",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3528,
+          "summary": "No results found. No records found for \"Anks today\". Check spelling or try a partial name.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "notes by Richard Bell this week",
+          "tag": "officer_specific_2",
+          "success": true,
+          "check_passed": true,
+          "row_count": 5,
+          "elapsed_ms": 3566,
+          "summary": "**5 notes** (Mar 10)\n\n\n  2026-03-10T09:11 Richard Bell - user | Logged into Armory | \n  2026-03-10T10:39 Richard Bell - user | Logged into Armory | \n  2026-03-10T10:56 Richard Bell - user | Logged into Armory | \n  2026-03-10T11:48 Richard Bell - user | Logged into Armory | \n  2026-03-10T12:03 Chow C",
+          "error": ""
+        },
+        {
+          "question": "list officers who added fire watch notes this week",
+          "tag": "officers_by_keyword",
+          "success": true,
+          "check_passed": true,
+          "row_count": 2,
+          "elapsed_ms": 3502,
+          "summary": "**2 records** found:\n\n  Bill Allen\n  Matthew Curran\n\n\ud83d\udca1 Ask: \"Which facilities have compliance gaps?\"",
+          "error": ""
+        },
+        {
+          "question": "show visitor log entries for last 30 days",
+          "tag": "visitor_log",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 3619,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        },
+        {
+          "question": "show all inactive users",
+          "tag": "inactive_users",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 1266,
+          "summary": "No results found. Try broadening the date range or adjusting search terms.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Inmate Name Search Patterns",
+      "persona": "officer_broad",
+      "total_ms": 15888,
+      "turns": [
+        {
+          "question": "all entries for inmate alester king in last 30 days",
+          "tag": "inmate_fullname",
+          "success": true,
+          "check_passed": true,
+          "row_count": 2,
+          "elapsed_ms": 4656,
+          "summary": "**2 notes** (Mar 11)\n\n\n  2026-03-11T14:24 Count\nE1 - In Count 0 | Out Count 0\n | Released Count 0 | Roster Count 1\nEC2A - In Count 0 | Out Cou\n  2026-03-11T14:25 Count\nE1 - In Count 0 | Out Count 0\n | Released Count 0 | Roster Count 1\nEC2A - In Count 0 | Out Cou\n\n\ud83d\udca1 Ask: \"Show movement history for th",
+          "error": ""
+        },
+        {
+          "question": "show me last note added for inmate anthony",
+          "tag": "inmate_firstname_only",
+          "success": true,
+          "check_passed": true,
+          "row_count": 1,
+          "elapsed_ms": 4226,
+          "summary": "**1 note** (Mar 12)\n\n\n  2026-03-12T12:54 Work Detail |  ANTHONY, NOVA -   - BK#: P01112850  Enroute | from 01-Facility Master to Kitchen | Pr\n\n\ud83d\udca1 Ask: \"Show movement history for this inmate\"",
+          "error": ""
+        },
+        {
+          "question": "currently where is inmate anthony",
+          "tag": "inmate_locate_single",
+          "success": true,
+          "check_passed": true,
+          "row_count": 13,
+          "elapsed_ms": 3602,
+          "summary": "**13 inmates** found:\n\n  **Aanthony Palmerb** \u2014 Jupiter-C1 \u00b7 Rm 3335 \u00b7 Bed 7 \u00b7 In the Cell\n  **Anthony Vigil** \u2014 Testing \u00b7 Rm 1388 \u00b7 In the Cell\n  **Anthony Rodriguez** \u2014 Testing \u00b7 Rm 1388 \u00b7 In the Cell\n  **Sarah Anthony** \u2014 Dorm-L-C \u00b7 Rm 17945 \u00b7 In the Cell\n  **Anthony Mitchell** \u2014 Dorm-L-E \u00b7 Rm 18",
+          "error": ""
+        },
+        {
+          "question": "show medical notes for inmate anthony in last 7 days",
+          "tag": "inmate_keyword_combo",
+          "success": true,
+          "check_passed": true,
+          "row_count": 10,
+          "elapsed_ms": 3403,
+          "summary": "**10 notes** (Mar 09 to Mar 11)\n\nBy: Muzzammil (3), Mark (2), Harris (1)\n\n  2026-03-10T18:26 Medical Rounds | ANTHONY, NOVA | 1D | BK#: P01112850\n  2026-03-11T05:17 ANTHONY, NOVA | 1D | BK#: P01112850 status updated Kiosk to | Medical | Sick Call\n  2026-03-11T13:45 Medical Emergency | ANTHONY, NOVA ",
+          "error": ""
+        }
+      ]
+    },
+    {
+      "name": "Edge Cases & Resilience",
+      "persona": "warden",
+      "total_ms": 9869,
+      "turns": [
+        {
+          "question": "what's the weather today",
+          "tag": "out_of_scope",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "I'm focused on correctional facility intelligence \u2014 inmate data, officer notes, facility operations, and compliance.\n\nI can't help with that, but try asking me:\n\u2022 \"How many notes were added today?\"\n\u2022 \"Show fire watch entries this week\"\n\u2022 \"Where is inmate Anthony?\"",
+          "error": ""
+        },
+        {
+          "question": "tell me a joke",
+          "tag": "out_of_scope_2",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "I'm focused on correctional facility intelligence \u2014 inmate data, officer notes, facility operations, and compliance.\n\nI can't help with that, but try asking me:\n\u2022 \"How many notes were added today?\"\n\u2022 \"Show fire watch entries this week\"\n\u2022 \"Where is inmate Anthony?\"",
+          "error": ""
+        },
+        {
+          "question": "what can you do for me",
+          "tag": "capability",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "Here's what I can do for you:\n\n\ud83d\udccb **Notes & Entries**\n  \u2022 Search notes by keyword, officer, date, or inmate\n  \u2022 Find fire watch, suicide watch, rounds, security entries\n  \u2022 Count notes by officer, shift, or time period\n  \u2022 Red-highlighted / priority entries\n  \u2022 Visitor log entries\n\n\ud83d\udc64 **Inmate Intelli",
+          "error": ""
+        },
+        {
+          "question": "who are you",
+          "tag": "bot_identity",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 2,
+          "summary": "I'm **Sarah**, your Inmate Intelligence assistant. I'm built to help correctional officers and wardens get fast, accurate answers from your facility data \u2014 notes, inmates, movements, compliance, and more.\n\nHere's what I can do for you:\n\n\ud83d\udccb **Notes & Entries**\n  \u2022 Search notes by keyword, officer, dat",
+          "error": ""
+        },
+        {
+          "question": "inventory entries",
+          "tag": "minimal_query",
+          "success": true,
+          "check_passed": true,
+          "row_count": 500,
+          "elapsed_ms": 2951,
+          "summary": "**500 notes** (Feb 16 to Mar 13)\n\n\n  2026-03-12T04:01 Dutta Utpal - 4fDemo | Logged into 01-Facility Master | \n  2026-02-17T08:21 Utpal Dutta-4fDemo | Logged into 01-Facility Master\n  2026-02-19T11:45 Utpal Dutta - 4fDemo | Logged into 01-Facility Master | \n  2026-02-19T11:46 Visitor Log | FaceMatch",
+          "error": ""
+        },
+        {
+          "question": "show me everything about inmate anthony nova",
+          "tag": "broad_inmate_query",
+          "success": true,
+          "check_passed": true,
+          "row_count": 0,
+          "elapsed_ms": 6908,
+          "summary": "No results found. No records found for \"anthony nova\". Check spelling or try a partial name.\n\n\ud83d\udca1 Try broadening the date range or checking the spelling.",
+          "error": ""
+        }
+      ]
+    }
+  ]
+}

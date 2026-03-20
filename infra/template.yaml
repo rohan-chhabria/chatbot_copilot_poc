@@ -1,0 +1,213 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  InmateCopilot V1 — Multi-tenant Intelligent Chatbot for Correctional Officers.
+  Text-to-SQL conversational AI with session management and conversation history.
+  Data sources are read-only Aurora MySQL endpoints per tenant.
+
+Globals:
+  Function:
+    Runtime: python3.10
+    Timeout: 60
+    MemorySize: 512
+    Environment:
+      Variables:
+        CONVERSATION_TABLE: !Ref ConversationTable
+        STRICT_TENANT_VALIDATION: !If [IsProd, "true", "false"]
+        LOG_LEVEL: !If [IsProd, "WARNING", "INFO"]
+        ENVIRONMENT: !Ref Environment
+        DEPLOYMENT_ID: !Ref DeploymentId
+        ENABLE_GUARDRAILS: "true"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: >
+      Deployment environment. Appended to all resource names for isolation
+      (e.g. InmateCopilot-Conversations-a1b2c3d4e5-dev).
+  DeploymentId:
+    Type: String
+    AllowedPattern: "[a-z0-9]{10}"
+    ConstraintDescription: "Must be exactly 10 lowercase alphanumeric characters."
+    Description: >
+      Unique 10-character ID per server/account. Generated ONCE during first
+      setup and reused for all subsequent deploys on that server.
+      Generate with: python3 -c "import uuid; print(uuid.uuid4().hex[:10])"
+  ValkeyEndpoint:
+    Type: String
+    Default: ""
+    Description: >
+      Valkey/ElastiCache endpoint for session storage.
+      Leave empty for in-memory fallback (dev mode).
+  TenantDbMap:
+    Type: String
+    Default: ""
+    Description: >
+      JSON map of customer_key to DB connection params.
+      Stored in AWS Secrets Manager for production.
+
+Conditions:
+  IsProd: !Equals [!Ref Environment, "prod"]
+  HasValkey: !Not [!Equals [!Ref ValkeyEndpoint, ""]]
+
+Resources:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  DynamoDB: Conversation History (multi-tenant — pk = customer_key#user_id)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  ConversationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "InmateCopilot-Conversations-${DeploymentId}-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  API Gateway
+  # ─────────────────────────────────────────────────────────────────────────
+
+  CopilotApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      StageName: Prod
+      MethodSettings:
+        - HttpMethod: "*"
+          ResourcePath: "/*"
+          ThrottlingBurstLimit: 100
+          ThrottlingRateLimit: 50
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Customer-Key'"
+        AllowOrigin: "'*'"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Lambda: Chatbot API
+  # ─────────────────────────────────────────────────────────────────────────
+
+  ChatbotFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "InmateCopilot-Chatbot-${DeploymentId}-${Environment}"
+      Handler: src.api.handler.lambda_handler
+      CodeUri: ../
+      MemorySize: 1024
+      Timeout: 120
+      Environment:
+        Variables:
+          VALKEY_HOST: !If [HasValkey, !Ref ValkeyEndpoint, ""]
+          TENANT_DB_MAP: !Ref TenantDbMap
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConversationTable
+      Events:
+        ChatApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CopilotApi
+            Path: /chat
+            Method: POST
+        HealthApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CopilotApi
+            Path: /health
+            Method: GET
+        SessionApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CopilotApi
+            Path: /session/{session_id}
+            Method: GET
+        HistoryApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CopilotApi
+            Path: /history
+            Method: GET
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  CloudWatch Alarms
+  # ─────────────────────────────────────────────────────────────────────────
+
+  ChatbotErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "InmateCopilot-Chatbot-Errors-${Environment}"
+      AlarmDescription: >
+        Fires when Chatbot Lambda has 5+ errors in 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ChatbotFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  ChatbotDurationAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "InmateCopilot-Chatbot-Duration-${Environment}"
+      AlarmDescription: >
+        Fires when Chatbot avg duration exceeds 100s (timeout=120s).
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ChatbotFunction
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 100000
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  ConversationThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "InmateCopilot-Conversations-Throttles-${Environment}"
+      AlarmDescription: >
+        DynamoDB throttling on Conversation table.
+      Namespace: AWS/DynamoDB
+      MetricName: ThrottledRequests
+      Dimensions:
+        - Name: TableName
+          Value: !Ref ConversationTable
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+Outputs:
+  ApiEndpoint:
+    Description: REST API base URL
+    Value: !Sub "https://${CopilotApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  ApiGatewayName:
+    Description: API Gateway name (visible in AWS Console)
+    Value: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+  ChatbotFunctionName:
+    Description: Chatbot Lambda function name
+    Value: !Ref ChatbotFunction
+  ConversationTableName:
+    Value: !Ref ConversationTable

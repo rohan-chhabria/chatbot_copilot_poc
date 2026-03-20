@@ -1,0 +1,209 @@
+[
+  {
+    "content": "SQL Restrictions - CRITICAL: ONLY SELECT queries are allowed. NEVER generate CALL statements or stored procedure calls. NEVER use CALL dg_notes_getsearchNotes or any other stored procedure. Always generate plain SELECT queries with proper WHERE clauses. Block UPDATE, DELETE, INSERT, ALTER, DROP, CREATE."
+  },
+  {
+    "content": "QUERY ROUTING - CRITICAL: Route based on intent. NOTES: 'notes', 'keyword', 'logged in', 'login', 'status update', 'video notes', 'visitor', 'entries' \u2192 dg_notes. INMATES: 'inmates', 'inmate list', 'inmate status', 'show inmates' \u2192 dg_tags. STATUS: 'status types', 'available statuses' \u2192 dg_tag_status. FACILITIES: 'facilities', 'facility list' \u2192 dg_facilities. KEYWORDS/ACTIVE NOTES: 'active notes used', 'keywords used', 'list active notes' \u2192 dg_notes_by_keyword."
+  },
+  {
+    "content": "QUERY TYPE DETECTION: DATA queries return rows (show, list, get, find, fetch, retrieve, entries). ANALYTICS queries return aggregates (count, total, sum, average, top, trend, analytics, distribution, how many). TIME queries return specific values (by when, what time, last time, first time)."
+  },
+  {
+    "content": "NOTES TABLE (dg_notes) - Alias 'n': notes_id (PK), notes_description (text), note_date, date_added, user_id (officer), facilities_id, shift_id, notetime. MANDATORY 5 columns for data queries: n.notes_id, n.notes_description, n.note_date, n.date_added, n.user_id"
+  },
+  {
+    "content": "INMATES TABLE (dg_tags) - Alias 't': tags_id (PK), emp_tag_id, emp_first_name, emp_last_name, status (1=active), facilities_id, tag_status_ids (status text), date_added, modify_date, gender, dob, room"
+  },
+  {
+    "content": "KEYWORDS TABLE (dg_notes_by_keyword) - Alias 'knw': Contains keyword_name column. Keywords are also called 'active notes' in the system. Common keywords: Fire Watch, Sight and Sound, Suicide Watch, Rounds, Health, Meal Time, Census Count, Bed Check."
+  },
+  {
+    "content": "ACTIVE NOTES TERMINOLOGY - CRITICAL: 'Active notes' refers to KEYWORDS from dg_notes_by_keyword table, NOT status=1. When user asks 'list active notes used', 'what active notes', 'show active notes used yesterday' \u2192 Query DISTINCT keyword_name from dg_notes_by_keyword joined with dg_notes."
+  },
+  {
+    "content": "LIST ACTIVE NOTES/KEYWORDS QUERY: SELECT DISTINCT knw.keyword_name FROM dg_notes n JOIN dg_notes_by_keyword knw ON n.notes_id = knw.notes_id WHERE knw.keyword_name IS NOT NULL AND knw.keyword_name != '' AND [date_filter]. This returns all unique keywords used in the specified period."
+  },
+  {
+    "content": "LAST NOTE TIME QUERY - CRITICAL: When user asks 'by when', 'what time', 'when was last note' \u2192 Use MAX(date_added) or MIN(date_added). Example: 'by when last note added yesterday' \u2192 SELECT MAX(n.date_added) AS last_note_time FROM dg_notes n WHERE DATE(n.date_added) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+  },
+  {
+    "content": "LOGIN/LOGGED IN NOTES - CRITICAL: When user asks for 'logged in notes', 'login notes', 'login entries', search notes_description for 'Logged into': WHERE LOWER(n.notes_description) LIKE '%logged into%'. These are system login records stored in dg_notes."
+  },
+  {
+    "content": "STATUS UPDATE NOTES - CRITICAL: When user asks for 'status update notes', 'status changed notes', search: WHERE LOWER(n.notes_description) LIKE '%status updated%'. These show inmate status changes."
+  },
+  {
+    "content": "VIDEO NOTES: When user asks for 'video notes', search: WHERE LOWER(n.notes_description) LIKE '%video notes%'. These contain video analysis data."
+  },
+  {
+    "content": "VISITOR LOG NOTES: When user asks for 'visitor notes', 'visitor log', search: WHERE LOWER(n.notes_description) LIKE '%visitor log%'. These contain visitor information."
+  },
+  {
+    "content": "TEXT SEARCH IN NOTES - PATTERN: For ANY text search in notes, use: WHERE LOWER(n.notes_description) LIKE '%searchterm%'. For multiple words: WHERE LOWER(n.notes_description) LIKE '%word1%' AND LOWER(n.notes_description) LIKE '%word2%'. ALWAYS use LOWER() and LIKE with % wildcards."
+  },
+  {
+    "content": "INMATE NOTES - USE INNER JOIN: For 'inmate related notes', 'notes for inmates', 'inmate notes': FROM dg_notes n INNER JOIN dg_notes_tags ntg ON n.notes_id = ntg.notes_id INNER JOIN dg_tags t ON ntg.tags_id = t.tags_id. Returns ONLY notes tagged to inmates."
+  },
+  {
+    "content": "KEYWORD/ACTIVE NOTES: Stored in dg_notes_by_keyword (keyword_name). Common keywords: Fire Watch, Incident, Medical, Census Count, Rounds, Meals, Shower, Shift Change, Use of Force, Zone Check, Lock Down, Legal Mail. Join: LEFT JOIN dg_notes_by_keyword knw ON n.notes_id = knw.notes_id"
+  },
+  {
+    "content": "KEYWORD SEARCH - MULTI-WORD CRITICAL: For multi-word keywords like 'census count', 'fire watch', 'zone check' - ALWAYS split into individual words with AND. Example: 'census count' \u2192 (LOWER(n.notes_description) LIKE '%census%' AND LOWER(n.notes_description) LIKE '%count%') OR (LOWER(knw.keyword_name) LIKE '%census%' AND LOWER(knw.keyword_name) LIKE '%count%'). NEVER use exact match for multi-word searches."
+  },
+  {
+    "content": "KEYWORD SEARCH ORDER: First search in notes_description with LIKE, THEN in keyword_name with LIKE. Use OR to combine: (LOWER(n.notes_description) LIKE '%term%' OR LOWER(knw.keyword_name) LIKE '%term%')"
+  },
+  {
+    "content": "OFFICER/USER SEARCH - CRITICAL FORMAT: User IDs are stored as 'firstname.lastname' format (e.g., 'Adam.Muller', 'rana.rakesh', 'Matthew.Curran'). NEVER EVER use exact match (=) for user_id. ALWAYS use LIKE with wildcards. FULL NAME RULE: When user provides TWO names like 'Rakesh Rana', 'John Smith', 'Matthew Curran' \u2192 split into separate LIKE clauses: WHERE (LOWER(n.user_id) LIKE '%rakesh%' AND LOWER(n.user_id) LIKE '%rana%'). NEVER use '%rakesh rana%' as single string - it won't match! SINGLE NAME RULE: For single name like 'saif', 'john', 'mike', 'sarah', 'matthew' \u2192 ALWAYS use LIKE: WHERE LOWER(n.user_id) LIKE '%name%'. NEVER use n.user_id = 'matthew' or LOWER(n.user_id) = 'matthew' because user_id format is 'firstname.lastname' and exact match will NEVER work. This applies to BOTH data queries AND count queries."
+  },
+  {
+    "content": "OFFICER NAME IN QUERIES - ABSOLUTE RULE: When user asks 'by officer X', 'notes by officer Y', 'entries added by officer Z' \u2192 ALWAYS use LIKE pattern, NEVER use exact match (=). Examples: 'by officer matthew' \u2192 LOWER(n.user_id) LIKE '%matthew%'. 'by officer matthew curran' \u2192 (LOWER(n.user_id) LIKE '%matthew%' AND LOWER(n.user_id) LIKE '%curran%'). 'by officer saif' \u2192 LOWER(n.user_id) LIKE '%saif%'. This is MANDATORY because user_id is stored as 'Firstname.Lastname' format."
+  },
+  {
+    "content": "INMATE STATUS QUERIES - CRITICAL UNDERSTANDING: Status represents what inmate is doing (Meal, Recreation, Medical, Sanitation, In the Cell, etc.). Status is tracked via: 1) CURRENT STATUS: dg_tags.role_call \u2192 JOIN \u2192 dg_tag_status.tag_status_id to get dg_tag_status.name, 2) STATUS HISTORY: dg_notes_tags.tag_status_id \u2192 JOIN \u2192 dg_tag_status to track status changes over time via notes. NEVER search for 'status updated' in notes_description!"
+  },
+  {
+    "content": "CURRENT STATUS QUERIES - MANDATORY PATTERN: For 'find inmates in meal status', 'show inmates in recreation', 'list inmates with current status' \u2192 ALWAYS use dg_tags.role_call JOIN with dg_tag_status: SELECT t.tags_id, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, ts.name AS current_status FROM dg_tags t LEFT JOIN dg_tag_status ts ON t.role_call = ts.tag_status_id WHERE t.status = 1 AND ts.status = 1 AND LOWER(ts.name) LIKE '%meal%'. The role_call column in dg_tags stores the tag_status_id which links to dg_tag_status.name."
+  },
+  {
+    "content": "STATUS HISTORY QUERIES - MANDATORY PATTERN: For 'show status changes for inmate X', 'status history for inmate Y', 'last 5 status changes' \u2192 Use dg_notes_tags.tag_status_id with JOIN to dg_tag_status: SELECT n.notes_id, n.note_date, n.date_added, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, ts.name AS status FROM dg_notes n INNER JOIN dg_notes_tags ntg ON n.notes_id = ntg.notes_id INNER JOIN dg_tags t ON ntg.tags_id = t.tags_id LEFT JOIN dg_tag_status ts ON ntg.tag_status_id = ts.tag_status_id WHERE [conditions] ORDER BY n.date_added DESC. This tracks status at each note creation time."
+  },
+  {
+    "content": "STATUS TABLE RELATIONSHIPS - CRITICAL: dg_tag_status (152 rows) = Lookup table with status names (Meal, Recreation, Medical, In the Cell, etc.). dg_tags.role_call stores current status ID \u2192 links to dg_tag_status.tag_status_id. dg_notes_tags.tag_status_id stores historical status ID at note creation time \u2192 links to dg_tag_status.tag_status_id. ALWAYS JOIN these tables to get readable status names from dg_tag_status.name."
+  },
+  {
+    "content": "STATUS QUERY RULES - ABSOLUTE: 1) NEVER use dg_tags.tag_status_ids or dg_notes_tags.tag_status_ids TEXT fields directly for filtering. 2) ALWAYS JOIN via role_call or tag_status_id to dg_tag_status table. 3) Filter on dg_tag_status.name with LIKE for status searches. 4) Current status = dg_tags.role_call \u2192 dg_tag_status. 5) History status = dg_notes_tags.tag_status_id \u2192 dg_tag_status ordered by date. 6) Common statuses: Meal, Recreation, Medical, Sanitation, In the Cell, Yard, Attorney Visit, Court Hearing."
+  },
+  {
+    "content": "OFFICER COUNT QUERIES - MANDATORY PATTERN: For 'how many notes by [Full Name]' or 'count notes by [Full Name]', ALWAYS split the name. Example: 'how many notes by Rakesh Rana' \u2192 SELECT COUNT(*) AS total FROM dg_notes n WHERE (LOWER(n.user_id) LIKE '%rakesh%' AND LOWER(n.user_id) LIKE '%rana%'). NEVER use LIKE '%firstname lastname%' - it will return 0 results."
+  },
+  {
+    "content": "DATE FILTERS: today = DATE(n.date_added) = CURDATE(). yesterday = DATE(n.date_added) = DATE_SUB(CURDATE(), INTERVAL 1 DAY). last N days = n.date_added >= DATE_SUB(CURDATE(), INTERVAL N DAY). DEFAULT: last 30 days if no date specified."
+  },
+  {
+    "content": "TABLE ALIASES - STANDARD: n = dg_notes, t = dg_tags, ts = dg_tag_status, f = dg_facilities, knw = dg_notes_by_keyword, ntg = dg_notes_tags"
+  },
+  {
+    "content": "AVOID SELECT * - Always list explicit columns. For notes: n.notes_id, n.notes_description, n.note_date, n.date_added, n.user_id"
+  },
+  {
+    "content": "COUNT PATTERNS - Notes: SELECT COUNT(*) AS total FROM dg_notes n WHERE ... Inmates: SELECT COUNT(*) AS total FROM dg_tags WHERE status = 1. By group: SELECT column, COUNT(*) AS total FROM table GROUP BY column"
+  },
+  {
+    "content": "COUNT KEYWORD NOTES - PATTERN: When user asks 'count [keyword] notes', 'total [keyword] notes', 'how many [keyword] notes', use: SELECT COUNT(*) AS total FROM dg_notes n LEFT JOIN dg_notes_by_keyword knw ON n.notes_id = knw.notes_id WHERE ((LOWER(n.notes_description) LIKE '%keyword%') OR (LOWER(knw.keyword_name) LIKE '%keyword%')). Example: 'count fire watch notes' \u2192 COUNT with fire AND watch LIKE patterns."
+  },
+  {
+    "content": "INMATE LIST: SELECT t.tags_id, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, t.emp_tag_id, t.tag_status_ids AS current_status, t.facilities_id FROM dg_tags t WHERE t.status = 1 ORDER BY t.modify_date DESC"
+  },
+  {
+    "content": "PERFORMANCE: Always include date filters for notes. Use LIMIT 1000 for data queries. Filter inmates by status = 1."
+  },
+  {
+    "content": "ENTRIES SYNONYM: When user says 'entries' or 'records', treat as notes. 'show all entries' = 'show all notes'. 'login entries' = 'login notes'."
+  },
+  {
+    "content": "HIGHLIGHTER TABLE (dg_highlighter): highlighter_id (PK), highlighter_name (color name: Red, Light Green, Blue, Yellow, Pink, White, Orange), highlighter_value (hex color code), status. Notes can be marked with highlighters via dg_notes.highlighter_id foreign key."
+  },
+  {
+    "content": "HIGHLIGHTED NOTES - DETECTION: When user asks about 'highlighted notes', 'notes with highlighter', 'marked notes', 'colored notes' \u2192 JOIN dg_notes n WITH dg_highlighter h ON n.highlighter_id = h.highlighter_id WHERE n.highlighter_id > 0. Include h.highlighter_name in SELECT."
+  },
+  {
+    "content": "HIGHLIGHTED NOTES BY COLOR: For 'blue highlighted notes', 'notes with red highlighter', 'yellow marked notes' \u2192 JOIN with dg_highlighter and filter by LOWER(h.highlighter_name) = 'color'. Available colors: Red, Light Green, Blue, Yellow, Pink, White, Orange."
+  },
+  {
+    "content": "HIGHLIGHTER QUERY PATTERN - DATA: SELECT n.notes_id, n.notes_description, n.note_date, n.date_added, n.user_id, h.highlighter_name, h.highlighter_value FROM dg_notes n JOIN dg_highlighter h ON n.highlighter_id = h.highlighter_id WHERE n.highlighter_id > 0 [AND date_filter]. For specific color add: AND LOWER(h.highlighter_name) = 'colorname'"
+  },
+  {
+    "content": "HIGHLIGHTER QUERY PATTERN - COUNT: SELECT COUNT(*) AS total FROM dg_notes n WHERE n.highlighter_id > 0 [AND date_filter]. For by-color count: JOIN dg_highlighter h ON n.highlighter_id = h.highlighter_id GROUP BY h.highlighter_name"
+  },
+  {
+    "content": "LIST AVAILABLE HIGHLIGHTERS - CRITICAL: When user asks 'total highlighter', 'list highlighters', 'how many highlighters', 'count highlighters', 'available highlighters', 'highlighter colors', 'total number of highlighters' \u2192 Query dg_highlighter table directly (NOT dg_notes): SELECT COUNT(*) AS total FROM dg_highlighter WHERE status = 1 OR SELECT highlighter_id, highlighter_name, highlighter_value FROM dg_highlighter WHERE status = 1. This returns the predefined highlighter colors, NOT notes with highlighters. NEVER count notes with highlighter_id for these queries."
+  },
+  {
+    "content": "WHO QUERIES - MUST RETURN user_id: When user asks 'who did X', 'who added Y', 'who cleared Z', 'who logged in' \u2192 ALWAYS include user_id in SELECT. Examples: 'who logged in first today' \u2192 SELECT n.user_id, MIN(n.date_added). 'who cleared the last count' \u2192 SELECT n.user_id, n.date_added WHERE...ORDER BY date_added DESC LIMIT 1. Never return only time without user_id."
+  },
+  {
+    "content": "DOOR/SECURITY TERMINOLOGY: When user asks about 'doors opened', 'doors secured', 'door activity', 'secured area' \u2192 These are valid prison operations. Search notes_description: WHERE LOWER(n.notes_description) LIKE '%door%'. Common patterns: 'door opened', 'door secured', 'door check', 'secure door'."
+  },
+  {
+    "content": "COUNT RELATED NOTES - PATTERN: When user asks about 'count related notes', 'entries related to count', notes that mention 'count' in description \u2192 WHERE LOWER(n.notes_description) LIKE '%count%'. This searches for the word 'count' in notes content."
+  },
+  {
+    "content": "MULTIPLE KEYWORDS SEARCH - OR LOGIC: When user asks for notes with MULTIPLE keywords like 'voip, visitor, incident' or 'fire watch, rounds, or medical' \u2192 Use OR between each keyword. Pattern: WHERE (LOWER(knw.keyword_name) LIKE '%keyword1%' OR LOWER(knw.keyword_name) LIKE '%keyword2%' OR LOWER(n.notes_description) LIKE '%keyword1%' OR LOWER(n.notes_description) LIKE '%keyword2%'). This returns notes matching ANY of the keywords."
+  },
+  {
+    "content": "MULTIPLE KEYWORDS - DATA QUERY: For 'fetch entries for keywords X, Y, Z' or 'notes with active notes A, B, C' \u2192 Return full note data (notes_id, notes_description, note_date, date_added, user_id) with LEFT JOIN to dg_notes_by_keyword. Use OR logic to match any keyword in keyword_name OR notes_description."
+  },
+  {
+    "content": "ACTIVE STATUS FILTERING - MANDATORY RULE: ALL queries MUST return ONLY active records. Status value for active records is non-zero (status != 0 or status = 1). This applies to: dg_notes (n.status = 1), dg_tags/inmates (t.status = 1), dg_user/officers (u.status = 1), dg_facilities (f.status = 1), dg_highlighter (h.status = 1), dg_tag_status (ts.status = 1). ALWAYS explicitly filter for active status in WHERE clause."
+  },
+  {
+    "content": "NOTES STATUS FILTER - CRITICAL: When querying dg_notes table, ALWAYS add n.status = 1 to filter only active notes. Pattern: FROM dg_notes n WHERE n.status = 1 AND [other_conditions]. For JOINs: FROM dg_notes n JOIN ... WHERE n.status = 1 AND ..."
+  },
+  {
+    "content": "INMATES/TAGS STATUS FILTER - CRITICAL: When querying dg_tags (inmates), ALWAYS add t.status = 1. Pattern: FROM dg_tags t WHERE t.status = 1 AND [other_conditions]. For inmate-related notes with JOINs: JOIN dg_tags t ON ntg.tags_id = t.tags_id WHERE t.status = 1."
+  },
+  {
+    "content": "USERS/OFFICERS STATUS FILTER - CRITICAL: When querying dg_user (officers), ALWAYS add u.status = 1. Pattern: FROM dg_user u WHERE u.status = 1. When joining with notes, this is typically not needed since notes reference user_id directly, but when listing officers, always filter status = 1."
+  },
+  {
+    "content": "MULTI-WORD KEYWORD SEARCH - MANDATORY SPLIT PATTERN: When searching for keywords/active notes with multiple words (e.g., 'elevated supervision', 'cell inspection', 'fire watch', 'lock down'), ALWAYS split into individual words and use AND logic. Pattern: WHERE ((LOWER(n.notes_description) LIKE '%word1%' AND LOWER(n.notes_description) LIKE '%word2%') OR (LOWER(knw.keyword_name) LIKE '%word1%' AND LOWER(knw.keyword_name) LIKE '%word2%')). Examples: 'elevated supervision' \u2192 LIKE '%elevated%' AND LIKE '%supervision%'. 'cell inspection' \u2192 LIKE '%cell%' AND LIKE '%inspection%'. 'fire watch' \u2192 LIKE '%fire%' AND LIKE '%watch%'. 'lock down' \u2192 LIKE '%lock%' AND LIKE '%down%'. This handles both spaced and combined formats (lockdown = lock down)."
+  },
+  {
+    "content": "COMPOUND WORD HANDLING - CRITICAL: For compound words that can be written together or spaced (lockdown/lock down, firewatch/fire watch), treat them identically by splitting: 'lockdown' \u2192 search as 'lock' AND 'down'. This ensures consistent results regardless of how users write the term. Pattern: WHERE ((LOWER(n.notes_description) LIKE '%lock%' AND LOWER(n.notes_description) LIKE '%down%') OR (LOWER(knw.keyword_name) LIKE '%lock%' AND LOWER(knw.keyword_name) LIKE '%down%'))."
+  },
+  {
+    "content": "USER QUERIES - ALWAYS SHOW NAMES: When listing users/officers, ALWAYS join dg_user table and display firstname + lastname, NOT just user_id. Pattern: FROM dg_notes n INNER JOIN dg_user u ON n.user_id = u.user_id ... SELECT n.user_id, u.firstname, u.lastname. For aggregations, use COUNT() and GROUP BY. Example: 'list users who created notes' \u2192 SELECT u.user_id, u.firstname, u.lastname, COUNT(n.notes_id) AS note_count FROM dg_notes n INNER JOIN dg_user u ON n.user_id = u.user_id GROUP BY u.user_id, u.firstname, u.lastname."
+  },
+  {
+    "content": "FACILITIES STATUS FILTER: When querying or joining dg_facilities, add f.status = 1. Pattern: JOIN dg_facilities f ON n.facilities_id = f.facilities_id AND f.status = 1. Or: FROM dg_facilities f WHERE f.status = 1."
+  },
+  {
+    "content": "HIGHLIGHTER STATUS FILTER: When querying dg_highlighter, add h.status = 1 OR status = 1. Pattern: JOIN dg_highlighter h ON n.highlighter_id = h.highlighter_id AND h.status = 1. For listing: FROM dg_highlighter WHERE status = 1."
+  },
+  {
+    "content": "STATUS FILTER EXAMPLES - Notes: SELECT n.notes_id, n.notes_description FROM dg_notes n WHERE n.status = 1 AND DATE(n.date_added) = CURDATE(). Inmates: SELECT t.tags_id, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name FROM dg_tags t WHERE t.status = 1. Combined: FROM dg_notes n JOIN dg_notes_tags ntg ON n.notes_id = ntg.notes_id JOIN dg_tags t ON ntg.tags_id = t.tags_id WHERE n.status = 1 AND t.status = 1."
+  },
+  {
+    "content": "MOVEMENT QUERIES - ROUTING LOGIC: 'inmate movement', 'movement records', 'movement entries', 'inmates moved' \u2192 Use dg_tags_movement table (structured data). 'notes about movement', 'notes related to movement', 'movement notes' \u2192 Search dg_notes with movement keyword (keyword_name LIKE '%movement%' OR notes_description LIKE '%movement%'). Movement table = actual movements. Movement notes = notes mentioning movement."
+  },
+  {
+    "content": "COUNT QUERIES WITH STATUS: When counting records, ALWAYS include status filter. Notes: SELECT COUNT(*) AS total FROM dg_notes n WHERE n.status = 1. Inmates: SELECT COUNT(*) AS total FROM dg_tags t WHERE t.status = 1. Officers: SELECT COUNT(*) AS total FROM dg_user u WHERE u.status = 1."
+  },
+  {
+    "content": "SUPPORTED FUNCTIONALITY - CRITICAL: This system supports ONLY queries about: 1) NOTES - officer logs, keywords/active notes, login entries, status updates, visitor logs, video notes 2) INMATES/TAGS - inmate records, status, movements 3) OFFICERS/USERS - who added notes, officer activity 4) FACILITIES - facility information 5) HIGHLIGHTERS - note colors/markers 6) ANALYTICS - counts, trends, grouping. For unsupported queries, respond with available search capabilities."
+  },
+  {
+    "content": "INMATE NAME SEARCH - CRITICAL RULES: ALWAYS use LIKE with % wildcards, NEVER use exact match (=) for names. SINGLE NAME RULE: For 'inmate Anthony', 'inmate John' \u2192 Use OR between first and last name: (LOWER(t.emp_first_name) LIKE '%anthony%' OR LOWER(t.emp_last_name) LIKE '%anthony%'). FULL NAME RULE: For 'inmate Anthony Nova', 'inmate John Smith' \u2192 Use AND between first and last: (LOWER(t.emp_first_name) LIKE '%anthony%' AND LOWER(t.emp_last_name) LIKE '%nova%'). For notes queries: JOIN dg_notes n with dg_notes_tags ntg and dg_tags t. ALWAYS return inmate name: CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name."
+  },
+  {
+    "content": "INMATE LOCATION QUERIES - CRITICAL: For 'where is inmate [name]', 'current location of inmate' \u2192 Query dg_tags table directly (NOT notes). Join with dg_facilities for facility name. Use t.room for current room/cell. Pattern: SELECT t.tags_id, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, t.emp_tag_id, t.tag_status_ids AS current_status, f.facility AS current_facility, t.room AS current_room FROM dg_tags t LEFT JOIN dg_facilities f ON t.facilities_id = f.facilities_id WHERE t.status = 1 AND f.status = 1. Use ORDER BY t.modify_date DESC LIMIT 10 for current data."
+  },
+  {
+    "content": "TIME-BASED QUERIES - CRITICAL: dg_notes table has 'notetime' column (TIME type, format HH:MM:SS). For queries like 'between 10 AM and 2 PM', 'entries from 9:00 to 11:30' \u2192 Use n.notetime BETWEEN 'HH:MM:SS' AND 'HH:MM:SS'. Convert 12-hour to 24-hour format: 2 PM = 14:00:00. Use with DATE filter on note_date or date_added. Pattern: WHERE n.notetime BETWEEN '10:00:00' AND '14:00:00' AND DATE(n.note_date) = '2025-01-23'."
+  },
+  {
+    "content": "SPECIFIC DATE QUERIES - CRITICAL: When user provides date without year like '23 Jan', '15 December', '5 March' \u2192 ALWAYS use current year: CONCAT(YEAR(CURDATE()), '-MM-DD'). Example: '23 Jan' \u2192 CONCAT(YEAR(CURDATE()), '-01-23'). When full date provided like '23 Jan 2026', '5 March 2025' \u2192 Use literal date: '2026-01-23', '2025-03-05'. Use DATE(n.date_added) for comparison."
+  },
+  {
+    "content": "RELATIVE DAY QUERIES - PATTERNS: 'last Friday', 'last Monday' \u2192 Calculate last occurrence of that weekday. MySQL DAYOFWEEK: 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday, 7=Saturday. For last Friday: DATE_SUB(CURDATE(), INTERVAL (DAYOFWEEK(CURDATE()) + 2) % 7 DAY). Use DATE(n.date_added) = [calculated_date] for exact day match."
+  },
+  {
+    "content": "INMATE MOVEMENT TABLE (dg_tags_movement) - CRITICAL COLUMNS: tags_movement_id (PK), tags_id (FK to inmates), old_room, new_room, old_facilities_id, new_facilities_id, date_added. For 'movement entries', 'movement records', 'inmates moved', 'room changes' \u2192 Query dg_tags_movement with JOINS to dg_tags (inmate), dg_facilities (BOTH old and new), dg_tag_status (current status). Pattern: FROM dg_tags_movement tm INNER JOIN dg_tags t ON tm.tags_id = t.tags_id INNER JOIN dg_facilities old_f ON tm.old_facilities_id = old_f.facilities_id INNER JOIN dg_facilities new_f ON tm.new_facilities_id = new_f.facilities_id LEFT JOIN dg_tag_status ts ON t.role_call = ts.tag_status_id WHERE t.status = 1 AND old_f.status = 1 AND new_f.status = 1. Return: inmate name, old_room, new_room, old_f.facility AS old_facility, new_f.facility AS new_facility, ts.name AS current_status, tm.date_added."
+  },
+  {
+    "content": "INMATE ROOM/CELL QUERIES - CRITICAL: For 'inmates in cell X', 'who is in room Y', 'show inmates in cell Z' \u2192 Query dg_tags.room column directly. Pattern: SELECT t.tags_id, CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, t.room FROM dg_tags t WHERE t.status = 1 AND t.room = 'cell_number'. Room/cell numbers are stored as strings (e.g., '49', '101', '45'). For counting: SELECT COUNT(*) AS total FROM dg_tags t WHERE t.status = 1 AND t.room = 'cell_number'. Use exact match (=) for room numbers."
+  },
+  {
+    "content": "CELL/ROOM LOCATION - CURRENT: The dg_tags.room column contains the inmate's CURRENT cell/room assignment. For 'where is inmate X', 'which cell is inmate Y in', 'current location' \u2192 Join dg_tags with dg_facilities, return t.room AS cell_number. Pattern: SELECT CONCAT(t.emp_first_name, ' ', t.emp_last_name) AS inmate_name, t.room AS cell_number, f.facility FROM dg_tags t LEFT JOIN dg_facilities f ON t.facilities_id = f.facilities_id WHERE t.status = 1."
+  },
+  {
+    "content": "BOOKING NUMBER SEARCH - CRITICAL: When user provides booking number, booking ID, emp_tag_id like 'P01112850', 'BK123456', 'ABC123' \u2192 Use exact match on t.emp_tag_id: WHERE t.emp_tag_id = 'booking_number'. For notes with booking number: JOIN dg_notes n with dg_notes_tags ntg and dg_tags t, filter by t.emp_tag_id = 'booking_number'. Pattern: FROM dg_notes n INNER JOIN dg_notes_tags ntg ON n.notes_id = ntg.notes_id INNER JOIN dg_tags t ON ntg.tags_id = t.tags_id WHERE t.emp_tag_id = 'booking_number'. Return inmate name and emp_tag_id."
+  },
+  {
+    "content": "ROOM CHANGE QUERIES - PATTERNS: For 'inmates who moved cells', 'room changes', 'cell transfers' \u2192 Query dg_tags_movement with facility JOINs. ALWAYS include both old_facility and new_facility. ALWAYS add current_status from dg_tag_status. Patterns: TODAY: DATE(tm.date_added) = CURDATE(). THIS WEEK: tm.date_added >= DATE_SUB(CURDATE(), INTERVAL 7 DAY). THIS MONTH: YEAR(tm.date_added) = YEAR(CURDATE()) AND MONTH(tm.date_added) = MONTH(CURDATE()). For specific room pairs: WHERE tm.old_room = 'X' AND tm.new_room = 'Y'."
+  },
+  {
+    "content": "INMATES PER CELL - COUNT: For 'how many inmates in cell X', 'count inmates per cell', 'inmates per room' \u2192 Use dg_tags.room with COUNT and GROUP BY. Pattern: SELECT t.room AS cell_number, COUNT(*) AS total FROM dg_tags t WHERE t.status = 1 AND t.room IS NOT NULL AND t.room != '' GROUP BY t.room ORDER BY total DESC. Filter by specific cell: WHERE t.room = 'cell_number'."
+  }
+]

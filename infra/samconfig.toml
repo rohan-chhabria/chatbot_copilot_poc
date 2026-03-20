@@ -1,0 +1,7 @@
+version = 0.1
+
+[default.validate.parameters]
+template_file = "infra/template.yaml"
+
+[default.build.parameters]
+use_container = false

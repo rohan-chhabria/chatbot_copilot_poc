@@ -1,0 +1,78 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CD — Continuous Deployment Pipeline
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+#  Manual dispatch only. Pick environment (dev/staging/prod) from dropdown.
+#
+#  Prerequisites (one-time):
+#    1. IAM OIDC provider for GitHub Actions
+#    2. IAM role with CF + Lambda + DynamoDB + API GW permissions
+#    3. GitHub Secrets: AWS_DEPLOY_ROLE_ARN, DEPLOYMENT_ID
+#    4. GitHub Environments: dev, staging (w/ reviewers), prod (w/ reviewers)
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: CD — Deploy to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (staging and prod require approval)"
+        required: true
+        default: dev
+        type: choice
+        options: [dev, staging, prod]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: SAM Build
+        run: sam build --template infra/template.yaml
+
+      - name: SAM Deploy
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "Deploying to environment: ${ENV}"
+          echo "DeploymentId: ${{ secrets.DEPLOYMENT_ID }}"
+          sam deploy \
+            --template-file .aws-sam/build/template.yaml \
+            --stack-name "InmateCopilot-V1-${ENV}" \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides "Environment=${ENV} DeploymentId=${{ secrets.DEPLOYMENT_ID }}" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --resolve-s3 \
+            --s3-prefix "InmateCopilot-V1"
+
+      - name: Show stack outputs
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          echo "=== Stack Outputs for InmateCopilot-V1-${ENV} ==="
+          aws cloudformation describe-stacks \
+            --stack-name "InmateCopilot-V1-${ENV}" \
+            --query 'Stacks[0].Outputs' \
+            --output table || echo "Could not fetch outputs"

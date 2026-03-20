@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InmateCopilot — Intelligence Dashboard</title>
+<style>
+:root {
+  --bg: #0f1117; --bg2: #161822; --card: #1c1f2e; --chat-bg: #12141e;
+  --accent: #4f7cff; --accent-glow: rgba(79,124,255,0.25); --accent-h: #6b93ff;
+  --txt: #e4e6f0; --txt2: #8b8fa3; --txt3: #555972;
+  --border: #262940; --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+  --user-bg: #2a3358; --bot-bg: #1e2235;
+  --r: 10px;
+  --f: 'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --fm: 'JetBrains Mono','Fira Code','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+body{font-family:var(--f);background:var(--bg);color:var(--txt);min-height:100vh}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#2a2e45;border-radius:3px}
+
+#login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 50% 30%,rgba(79,124,255,.08) 0%,transparent 60%)}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:48px 40px;width:420px;text-align:center}
+.login-box .logo{font-size:32px;font-weight:700;letter-spacing:-.5px;margin-bottom:6px}
+.login-box .logo span{color:var(--accent)}
+.login-box .sub{color:var(--txt2);font-size:14px;margin-bottom:32px}
+.ucards{display:flex;flex-direction:column;gap:10px}
+button.uc{font-family:var(--f);color:var(--txt);text-align:left;width:100%;display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:all .2s}
+button.uc:hover{border-color:var(--accent);background:rgba(79,124,255,.06);transform:translateY(-1px)}
+.av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+.uc .nm{font-weight:600;font-size:14px}.uc .rl{font-size:12px;color:var(--txt2);text-transform:capitalize}
+
+#dash{display:none;min-height:100vh}
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.top .br{font-size:17px;font-weight:700}.top .br span{color:var(--accent)}
+.top .ui{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--txt2)}
+.top .ua{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#fff}
+.top .lo{background:none;border:1px solid var(--border);color:var(--txt2);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--f)}
+.top .lo:hover{border-color:var(--err);color:var(--err)}
+.mc{padding:20px 24px}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.sc{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px}
+.sc .lb{font-size:11px;color:var(--txt2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.sc .vl{font-size:24px;font-weight:700}.sc .sb{font-size:11px;color:var(--txt3);margin-top:3px}
+.sc.a .vl{color:var(--accent)}.sc.s .vl{color:var(--ok)}.sc.w .vl{color:var(--warn)}
+
+.fab{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#6366f1);border:none;cursor:pointer;z-index:1000;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px var(--accent-glow);transition:all .3s}
+.fab:hover{transform:scale(1.08)}.fab svg{width:26px;height:26px;fill:#fff}
+.fab .pulse{position:absolute;width:100%;height:100%;border-radius:50%;background:var(--accent);opacity:0;animation:pulse 2s infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:.4}100%{transform:scale(1.6);opacity:0}}
+
+.cpanel{position:fixed;bottom:92px;right:24px;width:440px;height:600px;background:var(--chat-bg);border:1px solid var(--border);border-radius:16px;z-index:999;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 48px rgba(0,0,0,.5);animation:su .3s ease}
+.cpanel.open{display:flex}
+@keyframes su{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.ch{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.ch .bi{display:flex;align-items:center;gap:10px}
+.ch .ba{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#34d399,#06b6d4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#fff}
+.ch .bn{font-weight:600;font-size:13px}.ch .bs{font-size:10px;color:var(--ok);display:flex;align-items:center;gap:4px}
+.ch .hbtns{display:flex;align-items:center;gap:6px}
+.ch .cx{background:none;border:none;color:var(--txt2);cursor:pointer;font-size:16px;padding:4px}
+.ch .cx:hover{color:var(--txt)}
+
+.spk-toggle{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;cursor:pointer;color:var(--txt2);display:flex;align-items:center;gap:3px;transition:all .2s}
+.spk-toggle.on{border-color:var(--ok);color:var(--ok);background:rgba(52,211,153,.08)}
+.spk-toggle:hover{border-color:var(--accent)}
+.tts-gear{background:none;border:none;color:var(--txt3);cursor:pointer;font-size:13px;padding:2px 4px;transition:color .2s}
+.tts-gear:hover{color:var(--accent)}
+
+/* TTS Config popover */
+.tts-cfg{display:none;position:absolute;top:50px;right:10px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;width:260px;z-index:1001;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.tts-cfg.open{display:block}
+.tts-cfg h4{font-size:12px;color:var(--txt2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+.tts-cfg label{display:block;font-size:11px;color:var(--txt2);margin-bottom:3px}
+.tts-cfg select,.tts-cfg input[type=range]{width:100%;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--txt);padding:5px 8px;font-size:12px;font-family:var(--f)}
+.tts-cfg input[type=range]{padding:2px;-webkit-appearance:auto}
+.tts-cfg .rv{font-size:10px;color:var(--txt3);text-align:right;margin-top:-8px;margin-bottom:6px}
+
+.msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.m{max-width:90%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6;word-wrap:break-word;white-space:pre-wrap}
+.m.b{align-self:flex-start;background:var(--bot-bg);border:1px solid var(--border);border-top-left-radius:4px}
+.m.u{align-self:flex-end;background:var(--user-bg);border-top-right-radius:4px}
+.m .sn{font-size:10px;font-weight:600;margin-bottom:3px}
+.m.b .sn{color:var(--ok)}.m.u .sn{color:var(--accent)}
+.m .ct{color:var(--txt)}
+.m .ct strong{color:var(--accent);font-weight:600}
+
+.stm{align-self:center;font-size:11px;color:var(--txt3);padding:5px 12px;background:rgba(79,124,255,.06);border-radius:16px;display:flex;align-items:center;gap:5px}
+.stm .sp{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.cin{padding:10px 14px;border-top:1px solid var(--border);background:var(--bg2)}
+.cirow{display:flex;gap:6px;align-items:end}
+.ci{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--txt);font-size:13px;font-family:var(--f);outline:none;resize:none;min-height:38px;max-height:90px}
+.ci:focus{border-color:var(--accent)}.ci::placeholder{color:var(--txt3)}
+.csend,.cmic{background:var(--accent);border:none;border-radius:8px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s;flex-shrink:0}
+.csend:hover,.cmic:hover{background:var(--accent-h)}
+.csend:disabled,.cmic:disabled{opacity:.4;cursor:not-allowed}
+.csend svg,.cmic svg{width:16px;height:16px;fill:#fff}
+.cmic{background:#7c3aed}.cmic:hover{background:#9333ea}
+.cmic.recording{background:var(--err);animation:recPulse 1s infinite}
+@keyframes recPulse{0%,100%{opacity:1}50%{opacity:.6}}
+.csbar{padding:5px 14px;background:rgba(0,0,0,.2);border-top:1px solid var(--border);font-size:9px;color:var(--txt3);display:flex;justify-content:space-between}
+
+/* Scope selection styles */
+.scope-opts{display:flex;flex-direction:column;gap:6px}
+.scope-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;font-family:var(--f);color:var(--txt);transition:all .2s}
+.scope-btn:hover{border-color:var(--accent);background:rgba(79,124,255,.06);transform:translateX(4px)}
+.scope-btn.current{border-color:var(--ok);background:rgba(52,211,153,.08)}
+.scope-btn.visited{opacity:.85}
+.scope-btn .si{font-size:18px;width:26px;text-align:center;flex-shrink:0}
+.scope-btn .sl{font-weight:600;font-size:12px;flex-shrink:0}
+.scope-btn .sd{font-size:11px;color:var(--txt2);margin-left:auto}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-box">
+    <div class="logo">Inmate<span>Copilot</span></div>
+    <div class="sub">Intelligence Dashboard — Select your profile</div>
+    <div class="ucards" id="ucards"></div>
+  </div>
+</div>
+
+<div id="dash">
+  <div class="top">
+    <div class="br">Inmate<span>Copilot</span></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <div class="ui"><div class="ua" id="da"></div><div><div style="font-weight:600;color:var(--txt);font-size:13px" id="dn"></div><div style="font-size:10px" id="dr"></div></div></div>
+      <button class="lo" onclick="logout()">Sign Out</button>
+    </div>
+  </div>
+  <div class="mc">
+    <div class="sg">
+      <div class="sc a"><div class="lb">Session</div><div class="vl" style="font-size:12px;font-family:var(--fm);word-break:break-all" id="ds"></div><div class="sb">Active</div></div>
+      <div class="sc s"><div class="lb">Turns</div><div class="vl" id="dt">0</div><div class="sb">This session</div></div>
+      <div class="sc w"><div class="lb">Queries</div><div class="vl" id="dq">0</div><div class="sb">Executed</div></div>
+    </div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:14px">Quick Actions</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px" id="quick-actions">
+      <button onclick="quickAsk('Show fire watch notes today')" style="padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--txt);cursor:pointer;font-size:12px;font-family:var(--f)">Fire Watch Today</button>
+      <button onclick="quickAsk('How many notes added this week?')" style="padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--txt);cursor:pointer;font-size:12px;font-family:var(--f)">Notes This Week</button>
+      <button onclick="quickAsk('Top 5 officers by notes this month')" style="padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--txt);cursor:pointer;font-size:12px;font-family:var(--f)">Top Officers</button>
+      <button onclick="quickAsk('Red marked entries in last 7 days')" style="padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--txt);cursor:pointer;font-size:12px;font-family:var(--f)">Red Alerts</button>
+      <button onclick="quickAsk('List all inmate movements in last 7 days')" style="padding:8px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--txt);cursor:pointer;font-size:12px;font-family:var(--f)">Movements</button>
+    </div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:14px">Recent Queries</div>
+    <div id="qlog" style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;max-height:220px;overflow-y:auto;font-size:12px;color:var(--txt2)">
+      <div style="text-align:center;color:var(--txt3)">Open the chatbot to begin.</div>
+    </div>
+  </div>
+
+  <button class="fab" onclick="toggleChat()"><div class="pulse"></div><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/><path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/></svg></button>
+
+  <div class="cpanel" id="cpanel">
+    <div class="ch" style="position:relative">
+      <div class="bi"><div class="ba" id="bav">S</div><div><div class="bn" id="bnh">Sarah</div><div class="bs"><span style="color:var(--ok)">&#9679;</span> Online</div></div></div>
+      <div class="hbtns">
+        <button class="spk-toggle" id="spkbtn" onclick="toggleSpeaker()" title="Auto-speak responses">&#128264; Off</button>
+        <button class="tts-gear" id="ttsgear" onclick="toggleTTSConfig()" title="Voice settings">&#9881;</button>
+        <button class="cx" onclick="toggleChat()">&#10005;</button>
+      </div>
+      <div class="tts-cfg" id="ttscfg">
+        <h4>Voice Settings</h4>
+        <label>Voice</label>
+        <select id="ttsVoice"></select>
+        <label>Speed <span class="rv" id="speedVal">1.0x</span></label>
+        <input type="range" id="ttsSpeed" min="0.5" max="2" step="0.1" value="1.0" oninput="updSpeed(this)">
+        <label>Pitch <span class="rv" id="pitchVal">1.0</span></label>
+        <input type="range" id="ttsPitch" min="0.5" max="1.5" step="0.1" value="1.0" oninput="updPitch(this)">
+        <label>Language</label>
+        <select id="ttsLang" onchange="loadVoices()">
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="hi">Hindi</option>
+          <option value="pt">Portuguese</option>
+          <option value="ja">Japanese</option>
+          <option value="zh">Chinese</option>
+        </select>
+      </div>
+    </div>
+    <div class="scope-bar" id="scopebar" style="display:none;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg2)">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:var(--txt3)">Scope:</span>
+          <span id="currentScope" style="font-size:12px;font-weight:600;color:var(--accent)">—</span>
+        </div>
+        <button id="switchScopeBtn" onclick="showScopeOptions()" style="background:none;border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:10px;color:var(--txt2);cursor:pointer;font-family:var(--f)">Switch</button>
+      </div>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="cin">
+      <div class="cirow">
+        <button class="cmic" id="micbtn" onclick="toggleMic()" title="Voice input"><svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg></button>
+        <textarea class="ci" id="cinput" placeholder="Ask Sarah anything..." rows="1" onkeydown="hkey(event)"></textarea>
+        <button class="csend" id="sendbtn" onclick="send()"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
+      </div>
+    </div>
+    <div class="csbar"><span id="csl">No session</span><span id="ctc">0 turns</span></div>
+  </div>
+</div>
+
+<script>
+const API = location.origin;
+let S = {user:null,sid:null,bot:'Sarah',turns:0,queries:0,times:[],sending:false,scope:null};
+
+/* ── TTS State ── */
+let ttsOn = false;
+let ttsCfg = {speed:1.0, pitch:1.0, voiceURI:'', lang:'en'};
+
+function loadTTSCfg(){
+  try{const s=localStorage.getItem('ttsCfg');if(s)ttsCfg={...ttsCfg,...JSON.parse(s)}}catch{}
+  document.getElementById('ttsSpeed').value=ttsCfg.speed;
+  document.getElementById('ttsPitch').value=ttsCfg.pitch;
+  document.getElementById('ttsLang').value=ttsCfg.lang;
+  document.getElementById('speedVal').textContent=ttsCfg.speed+'x';
+  document.getElementById('pitchVal').textContent=ttsCfg.pitch;
+}
+function saveTTSCfg(){localStorage.setItem('ttsCfg',JSON.stringify(ttsCfg))}
+function updSpeed(el){ttsCfg.speed=parseFloat(el.value);document.getElementById('speedVal').textContent=el.value+'x';saveTTSCfg()}
+function updPitch(el){ttsCfg.pitch=parseFloat(el.value);document.getElementById('pitchVal').textContent=el.value;saveTTSCfg()}
+
+function loadVoices(){
+  const sel=document.getElementById('ttsVoice');
+  const lang=document.getElementById('ttsLang').value;
+  ttsCfg.lang=lang;saveTTSCfg();
+  const voices=speechSynthesis.getVoices();
+  sel.innerHTML='';
+  const matching=voices.filter(v=>v.lang.startsWith(lang));
+  const list=matching.length?matching:voices.slice(0,10);
+  list.forEach(v=>{
+    const o=document.createElement('option');
+    o.value=v.voiceURI;
+    o.textContent=v.name+(v.lang?' ('+v.lang+')':'');
+    if(v.voiceURI===ttsCfg.voiceURI)o.selected=true;
+    sel.appendChild(o);
+  });
+  if(!ttsCfg.voiceURI&&list.length)ttsCfg.voiceURI=list[0].voiceURI;
+  sel.onchange=()=>{ttsCfg.voiceURI=sel.value;saveTTSCfg()};
+}
+if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.onvoiceschanged=loadVoices;
+setTimeout(loadVoices,200);
+
+function toggleSpeaker(){
+  ttsOn=!ttsOn;
+  const btn=document.getElementById('spkbtn');
+  if(ttsOn){btn.classList.add('on');btn.innerHTML='&#128266; On'}
+  else{btn.classList.remove('on');btn.innerHTML='&#128264; Off';speechSynthesis.cancel()}
+}
+function toggleTTSConfig(){document.getElementById('ttscfg').classList.toggle('open')}
+
+function speakText(text){
+  if(!ttsOn||!text)return;
+  speechSynthesis.cancel();
+  const clean=text.replace(/[*#•\u2022\u2588\u2591\u2192💡📋👤🏢📊🔴]/g,'').replace(/\s+/g,' ').trim();
+  if(!clean)return;
+  const u=new SpeechSynthesisUtterance(clean);
+  u.rate=ttsCfg.speed;u.pitch=ttsCfg.pitch;
+  const voices=speechSynthesis.getVoices();
+  const v=voices.find(x=>x.voiceURI===ttsCfg.voiceURI);
+  if(v)u.voice=v;
+  u.lang=ttsCfg.lang||'en';
+  speechSynthesis.speak(u);
+}
+
+/* ── Init ── */
+async function init(){
+  loadTTSCfg();
+  try{const r=await fetch(API+'/users');const d=await r.json();S.bot=d.bot_name||'Sarah';renderUC(d.users)}
+  catch(e){document.getElementById('ucards').innerHTML='<div style="color:var(--err);font-size:13px">Backend not reachable.</div>'}
+}
+
+function renderUC(users){
+  document.getElementById('ucards').innerHTML=users.map(u=>
+    `<button class="uc" onclick='pickUser(${JSON.stringify(u)})'><div class="av">${u.avatar}</div><div><div class="nm">${u.display_name}</div><div class="rl">${u.role}</div></div></button>`
+  ).join('');
+}
+
+async function pickUser(u){
+  S.user=u;S.turns=0;S.queries=0;S.times=[];
+  try{
+    const r=await fetch(API+'/session/init',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:u.user_id})});
+    const d=await r.json();
+    S.sid=d.session_id;S.bot=d.bot_name;S.user={...S.user,...d.user};
+    document.getElementById('msgs').innerHTML='';
+    showDash();addBot(d.greeting);
+  }catch(e){alert('Session failed: '+e.message)}
+}
+
+function showDash(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('dash').style.display='block';
+  document.getElementById('da').textContent=S.user.avatar;
+  document.getElementById('dn').textContent=S.user.display_name;
+  document.getElementById('dr').textContent=S.user.role;
+  document.getElementById('ds').textContent=S.sid.slice(0,12)+'…';
+  document.getElementById('bav').textContent=S.bot[0];
+  document.getElementById('bnh').textContent=S.bot;
+  document.getElementById('csl').textContent='Session: '+S.sid.slice(0,8)+'…';
+}
+
+function logout(){
+  speechSynthesis.cancel();
+  S={user:null,sid:null,bot:'Sarah',turns:0,queries:0,times:[],sending:false};
+  document.getElementById('login').style.display='flex';
+  document.getElementById('dash').style.display='none';
+  document.getElementById('msgs').innerHTML='';
+  document.getElementById('cpanel').classList.remove('open');
+  init();
+}
+
+function toggleChat(){
+  const p=document.getElementById('cpanel');p.classList.toggle('open');
+  if(p.classList.contains('open'))document.getElementById('cinput').focus();
+  document.getElementById('ttscfg').classList.remove('open');
+}
+
+function quickAsk(q){
+  const p=document.getElementById('cpanel');
+  if(!p.classList.contains('open'))p.classList.add('open');
+  document.getElementById('cinput').value=q;
+  send();
+}
+
+function hkey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}}
+
+function addBot(text){
+  const c=document.getElementById('msgs'),m=document.createElement('div');
+  m.className='m b';
+  m.innerHTML=`<div class="sn">${S.bot}</div><div class="ct">${fmt(text)}</div>`;
+  c.appendChild(m);c.scrollTop=c.scrollHeight;
+  speakText(text);
+}
+
+/* ── Scope Selection ── */
+function renderScopeOptions(options, title='Select a topic to explore:'){
+  const c=document.getElementById('msgs');
+  const m=document.createElement('div');
+  m.className='m b scope-selector';
+  let html=`<div class="sn">${S.bot}</div><div class="ct"><div style="margin-bottom:10px">${esc(title)}</div><div class="scope-opts">`;
+  options.forEach(opt=>{
+    const visited=opt.is_visited?' visited':'';
+    const current=opt.is_current?' current':'';
+    html+=`<button class="scope-btn${visited}${current}" onclick='selectScope("${opt.id}")'><span class="si">${opt.icon||'📋'}</span><span class="sl">${esc(opt.label)}</span><span class="sd">${esc(opt.description||'')}</span></button>`;
+  });
+  html+=`</div></div>`;
+  m.innerHTML=html;
+  c.appendChild(m);c.scrollTop=c.scrollHeight;
+}
+
+async function selectScope(scopeId){
+  addStatus('Switching scope...');
+  try{
+    const r=await fetch(API+'/scope/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:S.sid,scope:scopeId})});
+    const d=await r.json();rmStatus();
+    if(!r.ok){addBot('Error: '+(d.detail||d.error||'Failed to switch scope'));return}
+    S.scope=scopeId;
+    updateScopeBar(d.scope_label||scopeId,d.scope_icon);
+    addBot(d.summary||`Now exploring: ${d.scope_label||scopeId}`);
+  }catch(e){rmStatus();addBot('Failed to switch scope: '+e.message)}
+}
+
+function updateScopeBar(label, icon){
+  const bar=document.getElementById('scopebar');
+  const current=document.getElementById('currentScope');
+  if(S.scope){
+    bar.style.display='block';
+    current.textContent=(icon||'')+ ' '+label;
+  }else{
+    bar.style.display='none';
+    current.textContent='—';
+  }
+}
+
+async function showScopeOptions(){
+  try{
+    const r=await fetch(API+'/scope/options?session_id='+encodeURIComponent(S.sid));
+    const d=await r.json();
+    if(d.options&&d.options.length)renderScopeOptions(d.options,'Switch to a different topic:');
+    else addBot("No scopes available.");
+  }catch(e){addBot("Error loading scopes: "+e.message)}
+}
+
+function addUser(text){
+  const c=document.getElementById('msgs'),m=document.createElement('div');
+  m.className='m u';m.innerHTML=`<div class="sn">You</div><div class="ct">${esc(text)}</div>`;
+  c.appendChild(m);c.scrollTop=c.scrollHeight;
+}
+
+function addStatus(text){
+  const c=document.getElementById('msgs'),el=document.createElement('div');
+  el.className='stm';el.id='cstatus';
+  el.innerHTML=`<div class="sp"></div>${esc(text)}`;
+  c.appendChild(el);c.scrollTop=c.scrollHeight;return el;
+}
+
+function rmStatus(){const el=document.getElementById('cstatus');if(el)el.remove()}
+function updStatus(text){const el=document.getElementById('cstatus');if(el)el.innerHTML=`<div class="sp"></div>${esc(text)}`}
+
+function updStats(t){
+  S.turns+=2;S.queries++;if(t)S.times.push(t);
+  document.getElementById('dt').textContent=S.turns;
+  document.getElementById('dq').textContent=S.queries;
+  document.getElementById('ctc').textContent=S.turns+' turns';
+}
+
+function addLog(q,ok,t){
+  const log=document.getElementById('qlog');
+  if(log.querySelector('[style*="text-align"]'))log.innerHTML='';
+  const e=document.createElement('div');e.style.cssText='padding:5px 0;border-bottom:1px solid var(--border)';
+  e.innerHTML=`<span style="color:${ok?'var(--ok)':'var(--err)'}">${ok?'✓':'✗'}</span> ${esc(q.slice(0,50))}${q.length>50?'…':''} <span style="float:right;color:var(--txt3)">${(t/1000).toFixed(1)}s</span>`;
+  log.prepend(e);
+}
+
+/* ── SSE Send ── */
+async function send(){
+  const inp=document.getElementById('cinput'),text=inp.value.trim();
+  if(!text||S.sending)return;
+  S.sending=true;inp.value='';document.getElementById('sendbtn').disabled=true;
+  addUser(text);addStatus('Thinking...');const t0=Date.now();
+  
+  try{
+    const r=await fetch(API+'/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:text,session_id:S.sid,customer_key:S.user.customer_key||'demo',user_id:S.user.user_id,facility_ids:S.user.facility_ids||[],role:S.user.role||'officer'})});
+    const rd=r.body.getReader();const dec=new TextDecoder();let buf='',result=null,evtName='';
+    while(true){
+      const{value,done}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});const lines=buf.split('\n');buf=lines.pop();
+      for(const l of lines){
+        if(l.startsWith('event:'))evtName=l.slice(6).trim();
+        if(l.startsWith('data:')){
+          const d=l.slice(5).trim();if(!d)continue;
+          if(evtName==='status')updStatus(d);
+          else if(evtName==='result'){try{result=JSON.parse(d)}catch{}}
+          else if(evtName==='error'){rmStatus();addBot('Sorry, something went wrong. '+d)}
+          else if(evtName==='session'){try{const s=JSON.parse(d);if(s.session_id)S.sid=s.session_id}catch{}}
+          else if(evtName==='scope_options'){
+            try{
+              const opts=JSON.parse(d);
+              rmStatus();
+              if(opts.options&&opts.options.length)renderScopeOptions(opts.options);
+            }catch{}
+          }
+        }
+      }
+    }
+    rmStatus();const elapsed=Date.now()-t0;
+    if(result){
+      // Handle V2 scope responses
+      if(result.requires_scope && result.options){
+        renderScopeOptions(result.options);
+      }else{
+        addBot(result.summary||'Done.');
+        if(result.scope){
+          S.scope=result.scope;
+          updateScopeBar(result.scope_label||result.scope,result.scope_icon);
+        }
+      }
+      if(!result.is_conversational && !result.requires_scope){updStats(elapsed);addLog(text,true,elapsed)}
+    }
+  }catch(e){rmStatus();addBot('Connection error. Please try again.')}
+  S.sending=false;document.getElementById('sendbtn').disabled=false;document.getElementById('cinput').focus();
+}
+
+/* ── STT ── */
+let recognition=null,isRecording=false;
+function toggleMic(){
+  if(isRecording){stopMic();return}
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert('Speech recognition not supported');return}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();recognition.continuous=false;recognition.interimResults=false;recognition.lang='en-US';
+  recognition.onstart=()=>{isRecording=true;document.getElementById('micbtn').classList.add('recording')};
+  recognition.onresult=(e)=>{document.getElementById('cinput').value=e.results[0][0].transcript;stopMic();setTimeout(()=>send(),300)};
+  recognition.onerror=()=>stopMic();
+  recognition.onend=()=>stopMic();
+  recognition.start();
+}
+function stopMic(){
+  isRecording=false;document.getElementById('micbtn').classList.remove('recording');
+  if(recognition){try{recognition.stop()}catch{}}
+}
+
+/* ── Helpers ── */
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
+function fmt(t){
+  let s=esc(t);
+  s=s.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/^(\s*)(•|\-)\s/gm,'$1<span style="color:var(--accent)">•</span> ');
+  s=s.replace(/^(\s*)(\d+)\.\s/gm,'$1<span style="color:var(--accent);font-weight:600">$2.</span> ');
+  s=s.replace(/💡(.+)/g,'<span style="color:var(--warn);font-size:11px">💡$1</span>');
+  return s;
+}
+
+document.addEventListener('click',function(e){
+  const cfg=document.getElementById('ttscfg');
+  const gear=document.getElementById('ttsgear');
+  if(cfg&&cfg.classList.contains('open')&&!cfg.contains(e.target)&&e.target!==gear)cfg.classList.remove('open');
+});
+
+init();
+</script>
+</body>
+</html>

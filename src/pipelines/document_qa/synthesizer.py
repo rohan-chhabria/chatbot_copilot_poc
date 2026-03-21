@@ -43,7 +43,23 @@ class ResponseSynthesizer:
         chunks: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Generate an answer from retrieved chunks."""
+        logger.debug(
+            "Synthesizing answer: question=%r, num_chunks=%d",
+            question[:100],
+            len(chunks),
+        )
+
         context = self._build_context(chunks)
+        logger.debug("Built context: %d chars", len(context))
+
+        # Log chunks being sent to LLM
+        for i, chunk in enumerate(chunks):
+            logger.debug(
+                "  Chunk[%d]: file=%s, text=%r",
+                i,
+                chunk.get("metadata", {}).get("filename", "?"),
+                chunk.get("text", "")[:100],
+            )
 
         messages = [
             {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
@@ -53,6 +69,8 @@ class ResponseSynthesizer:
             },
         ]
 
+        logger.debug("Calling LLM: model=%s, temp=%.2f", self._model, LLM_TEMPERATURE)
+
         response = await self._openai.chat.completions.create(
             model=self._model,
             messages=messages,
@@ -61,6 +79,7 @@ class ResponseSynthesizer:
         )
 
         answer = response.choices[0].message.content or ""
+        logger.debug("LLM response: %d chars", len(answer))
 
         # Extract sources
         sources = self._extract_sources(chunks)
@@ -76,7 +95,23 @@ class ResponseSynthesizer:
         chunks: list[dict[str, Any]],
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream answer generation."""
+        logger.debug(
+            "Synthesizing (stream): question=%r, num_chunks=%d",
+            question[:100],
+            len(chunks),
+        )
+
         context = self._build_context(chunks)
+        logger.debug("Built context: %d chars", len(context))
+
+        # Log chunks being sent to LLM
+        for i, chunk in enumerate(chunks):
+            logger.debug(
+                "  Chunk[%d]: file=%s, text=%r",
+                i,
+                chunk.get("metadata", {}).get("filename", "?"),
+                chunk.get("text", "")[:100],
+            )
 
         messages = [
             {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
@@ -87,6 +122,8 @@ class ResponseSynthesizer:
         ]
 
         yield {"event": "status", "data": "Generating answer..."}
+
+        logger.debug("Calling LLM stream: model=%s", self._model)
 
         stream = await self._openai.chat.completions.create(
             model=self._model,
@@ -102,6 +139,8 @@ class ResponseSynthesizer:
                 token = chunk.choices[0].delta.content
                 full_answer += token
                 yield {"event": "token", "data": token}
+
+        logger.debug("LLM stream complete: %d chars", len(full_answer))
 
         sources = self._extract_sources(chunks)
 

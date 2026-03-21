@@ -54,21 +54,50 @@ class DocumentRetriever:
     ) -> list[dict[str, Any]]:
         """Retrieve relevant chunks for a question."""
         top_k = top_k or DOC_RETRIEVAL_TOP_K
+        logger.debug(
+            "Retrieve request: question=%r, top_k=%d, hybrid=%s",
+            question[:100],
+            top_k,
+            DOC_HYBRID_SEARCH,
+        )
 
         # Get query embedding
         embedding = await self._get_embedding(question)
+        logger.debug("Generated query embedding: dim=%d", len(embedding))
 
         # Semantic search
         semantic_results = store.search(
             query_embedding=embedding,
             top_k=top_k * 4,  # Get more for fusion
         )
+        logger.debug(
+            "Semantic search returned %d results",
+            len(semantic_results),
+        )
+        for i, r in enumerate(semantic_results[:5]):
+            logger.debug(
+                "  Semantic[%d]: score=%.4f, file=%s, text=%r",
+                i,
+                r.get("score", 0),
+                r.get("metadata", {}).get("filename", "?"),
+                r.get("text", "")[:80],
+            )
 
         if not DOC_HYBRID_SEARCH or store.count() == 0:
+            logger.debug("Returning semantic-only results (hybrid disabled or empty store)")
             return semantic_results[:top_k]
 
         # BM25 search
         bm25_results = self._bm25_search(question, store, top_k * 4)
+        logger.debug("BM25 search returned %d results", len(bm25_results))
+        for i, r in enumerate(bm25_results[:5]):
+            logger.debug(
+                "  BM25[%d]: score=%.4f, file=%s, text=%r",
+                i,
+                r.get("bm25_score", 0),
+                r.get("metadata", {}).get("filename", "?"),
+                r.get("text", "")[:80],
+            )
 
         # RRF fusion
         fused = self._reciprocal_rank_fusion(
@@ -76,18 +105,44 @@ class DocumentRetriever:
             bm25_results,
             top_k,
         )
+        logger.debug("RRF fusion produced %d results", len(fused))
+        for i, r in enumerate(fused[:5]):
+            logger.debug(
+                "  Fused[%d]: rrf=%.4f, file=%s, text=%r",
+                i,
+                r.get("rrf_score", 0),
+                r.get("metadata", {}).get("filename", "?"),
+                r.get("text", "")[:80],
+            )
 
         # Context-aware boosting
         if context and context.recent_entities.get("last_docs"):
+            logger.debug(
+                "Applying context boost for recent docs: %s",
+                context.recent_entities["last_docs"],
+            )
             fused = self._boost_recent_docs(
                 fused,
                 context.recent_entities["last_docs"],
             )
 
         # Deduplicate
+        pre_dedup = len(fused)
         fused = self._deduplicate(fused)
+        logger.debug(
+            "Deduplication: %d -> %d chunks",
+            pre_dedup,
+            len(fused),
+        )
 
-        return fused[:top_k]
+        final_results = fused[:top_k]
+        logger.debug(
+            "Final retrieval: returning %d chunks for question=%r",
+            len(final_results),
+            question[:50],
+        )
+
+        return final_results
 
     async def _get_embedding(self, text: str) -> list[float]:
         """Generate embedding for text."""
@@ -108,16 +163,25 @@ class DocumentRetriever:
 
         # Build/update BM25 index if needed
         if tenant not in self._bm25_indices:
+            logger.debug("BM25 index not found for tenant=%s, building...", tenant)
             self._build_bm25_index(store)
 
         if tenant not in self._bm25_indices:
+            logger.debug("BM25 index build failed for tenant=%s", tenant)
             return []
 
         # Tokenize query
         tokens = self._tokenize(question)
+        logger.debug("BM25 query tokens: %s", tokens)
 
         # Score documents
         scores = self._bm25_indices[tenant].get_scores(tokens)
+        non_zero = sum(1 for s in scores if s > 0)
+        logger.debug(
+            "BM25 scoring: %d docs scored, %d with score > 0",
+            len(scores),
+            non_zero,
+        )
 
         # Rank
         ranked = sorted(

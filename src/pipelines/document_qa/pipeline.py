@@ -61,10 +61,20 @@ class DocumentQAPipeline(Pipeline):
         scope_context: ScopeContext,
     ) -> dict[str, Any]:
         """Process a document question."""
+        logger.debug(
+            "DocumentQA.process: question=%r, user=%s, tenant=%s",
+            question[:100],
+            session.user_id,
+            session.customer_key,
+        )
+
         store = self._get_store(session.customer_key)
+        doc_count = store.count()
+        logger.debug("Document store has %d chunks", doc_count)
 
         # Check if any documents indexed
-        if store.count() == 0:
+        if doc_count == 0:
+            logger.debug("No documents indexed, returning early")
             return {
                 "summary": (
                     "No documents have been indexed yet. "
@@ -75,13 +85,16 @@ class DocumentQAPipeline(Pipeline):
             }
 
         # Retrieve relevant chunks
+        logger.debug("Starting retrieval...")
         chunks = await self._retriever.retrieve(
             question=question,
             store=store,
             context=scope_context,
         )
+        logger.debug("Retrieval returned %d chunks", len(chunks))
 
         if not chunks:
+            logger.debug("No chunks retrieved, returning no-results response")
             return {
                 "summary": (
                     "I couldn't find any relevant information in the documents. "
@@ -92,10 +105,12 @@ class DocumentQAPipeline(Pipeline):
             }
 
         # Synthesize response
+        logger.debug("Starting synthesis with %d chunks...", len(chunks))
         response = await self._synthesizer.synthesize(
             question=question,
             chunks=chunks,
         )
+        logger.debug("Synthesis complete, answer length=%d", len(response.get("answer", "")))
 
         # Update scope context
         scope_context.add_query(question)
@@ -118,21 +133,33 @@ class DocumentQAPipeline(Pipeline):
         scope_context: ScopeContext,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream document QA response."""
+        logger.debug(
+            "DocumentQA.process_stream: question=%r, user=%s",
+            question[:100],
+            session.user_id,
+        )
+
         yield {"event": "status", "data": "Searching documents..."}
 
         store = self._get_store(session.customer_key)
+        doc_count = store.count()
+        logger.debug("Document store has %d chunks", doc_count)
 
-        if store.count() == 0:
+        if doc_count == 0:
+            logger.debug("No documents indexed")
             yield {"event": "error", "data": "No documents indexed."}
             return
 
+        logger.debug("Starting retrieval...")
         chunks = await self._retriever.retrieve(
             question=question,
             store=store,
             context=scope_context,
         )
+        logger.debug("Retrieval returned %d chunks", len(chunks))
 
         if not chunks:
+            logger.debug("No chunks retrieved")
             yield {
                 "event": "result",
                 "data": {
@@ -147,8 +174,11 @@ class DocumentQAPipeline(Pipeline):
             "data": f"Found {len(chunks)} relevant sections...",
         }
 
+        logger.debug("Starting stream synthesis...")
         async for event in self._synthesizer.synthesize_stream(question, chunks):
             yield event
+
+        logger.debug("Stream synthesis complete")
 
         # Update context
         scope_context.add_query(question)

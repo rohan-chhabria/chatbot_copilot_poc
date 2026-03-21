@@ -45,12 +45,14 @@ class InmateDataPipeline(Pipeline):
     def _get_vanna_pipeline(self):
         """Lazy initialization of the Vanna pipeline."""
         if self._vanna_pipeline is None:
+            logger.debug("Initializing Vanna pipeline (lazy init)...")
             from src.pipelines.inmate_data.vanna_agent import AgentPipeline
 
             self._vanna_pipeline = AgentPipeline(
                 session_store=self._session_store,
                 conversation_store=self._conversation_store,
             )
+            logger.debug("Vanna pipeline initialized")
         return self._vanna_pipeline
 
     async def process(
@@ -60,17 +62,33 @@ class InmateDataPipeline(Pipeline):
         scope_context: ScopeContext,
     ) -> dict[str, Any]:
         """Process a data query."""
+        logger.debug(
+            "InmateDataPipeline.process: question=%r, user=%s, tenant=%s",
+            question[:100],
+            session.user_id,
+            session.customer_key,
+        )
+
         from src.tenant.tenant_router import resolve_tenant
 
         # Get tenant context
         tenant = resolve_tenant(session.customer_key)
+        logger.debug("Resolved tenant: %s", tenant.customer_key if tenant else "None")
 
         # Use existing Vanna pipeline
         pipeline = self._get_vanna_pipeline()
+        logger.debug("Calling Vanna pipeline.process_question...")
+
         response = await pipeline.process_question(
             question=question,
             session=session,
             tenant=tenant,
+        )
+
+        logger.debug(
+            "Vanna pipeline returned: row_count=%s, has_error=%s",
+            response.get("row_count"),
+            "error" in response,
         )
 
         # Update scope context with entities
@@ -85,17 +103,28 @@ class InmateDataPipeline(Pipeline):
         scope_context: ScopeContext,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream a data query response."""
+        logger.debug(
+            "InmateDataPipeline.process_stream: question=%r, user=%s",
+            question[:100],
+            session.user_id,
+        )
+
         from src.tenant.tenant_router import resolve_tenant
 
         tenant = resolve_tenant(session.customer_key)
+        logger.debug("Resolved tenant: %s", tenant.customer_key if tenant else "None")
+
         pipeline = self._get_vanna_pipeline()
 
+        logger.debug("Starting Vanna stream...")
         async for event in pipeline.process_question_stream(
             question=question,
             session=session,
             tenant=tenant,
         ):
             yield event
+
+        logger.debug("Vanna stream complete")
 
     async def health(self) -> dict[str, Any]:
         """Check pipeline health."""

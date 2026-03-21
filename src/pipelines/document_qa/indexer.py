@@ -50,6 +50,13 @@ class DocumentIndexer:
         )
         self._openai = AsyncOpenAI(api_key=OPENAI_API_KEY)
         self._embedding_model = embedding_model or DOC_EMBEDDING_MODEL
+        logger.debug(
+            "DocumentIndexer initialized: tenant=%s, chunk_size=%d, overlap=%d, model=%s",
+            customer_key,
+            chunk_size,
+            chunk_overlap,
+            self._embedding_model,
+        )
 
     async def index_file(self, file_path: str | Path) -> dict[str, Any]:
         """
@@ -170,10 +177,19 @@ class DocumentIndexer:
 
     async def _index_document(self, doc: Document) -> dict[str, Any]:
         """Internal method to index a loaded document."""
+        logger.debug(
+            "Indexing document: %s (type=%s, content_len=%d)",
+            doc.filename,
+            doc.file_type,
+            len(doc.content),
+        )
+
         # Chunk the document
         chunks = self._chunker.chunk_document(doc)
+        logger.debug("Chunked document into %d chunks", len(chunks))
 
         if not chunks:
+            logger.debug("No chunks generated for %s", doc.filename)
             return {
                 "success": True,
                 "doc_id": doc.doc_id,
@@ -182,9 +198,22 @@ class DocumentIndexer:
                 "message": "Document has no content to index",
             }
 
+        # Log sample chunks for debugging
+        for i, c in enumerate(chunks[:3]):
+            logger.debug(
+                "  Chunk[%d]: %d chars, text=%r",
+                i,
+                len(c.text),
+                c.text[:80],
+            )
+        if len(chunks) > 3:
+            logger.debug("  ... and %d more chunks", len(chunks) - 3)
+
         # Generate embeddings
         texts = [c.text for c in chunks]
+        logger.debug("Generating embeddings for %d chunks...", len(texts))
         embeddings = await self._generate_embeddings(texts)
+        logger.debug("Generated %d embeddings (dim=%d)", len(embeddings), len(embeddings[0]) if embeddings else 0)
 
         # Prepare metadata
         metadata = [
@@ -201,6 +230,7 @@ class DocumentIndexer:
 
         # Store in ChromaDB
         ids = self._store.add_chunks(texts, embeddings, metadata)
+        logger.debug("Stored %d chunks in ChromaDB", len(ids))
 
         logger.info(
             "Indexed %s: %d chunks",

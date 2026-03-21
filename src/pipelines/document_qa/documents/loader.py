@@ -27,14 +27,25 @@ class DocumentLoader:
     def load_file(self, file_path: str | Path) -> Document:
         """Load a document from a file path."""
         path = Path(file_path)
+        logger.debug("Loading file: %s", path)
+
         if not path.exists():
+            logger.debug("File not found: %s", path)
             raise DocumentError(f"File not found: {file_path}")
 
         file_type = path.suffix.lower().lstrip(".")
         if file_type not in self.SUPPORTED_TYPES:
+            logger.debug("Unsupported file type: %s", file_type)
             raise DocumentError(f"Unsupported file type: {file_type}")
 
+        logger.debug("Extracting content from %s (type=%s)...", path.name, file_type)
         content = self._extract_content(path, file_type)
+        logger.debug(
+            "Extracted %d chars from %s",
+            len(content),
+            path.name,
+        )
+
         return Document.create(
             filename=path.name,
             file_type=file_type,
@@ -97,13 +108,17 @@ class DocumentLoader:
         try:
             import pypdf
 
+            logger.debug("Extracting PDF with pypdf: %s", path.name)
             reader = pypdf.PdfReader(str(path))
             text_parts = []
-            for page in reader.pages:
+            for i, page in enumerate(reader.pages):
                 text = page.extract_text()
                 if text:
                     text_parts.append(text)
-            return "\n\n".join(text_parts)
+                    logger.debug("  Page %d: %d chars", i + 1, len(text))
+            result = "\n\n".join(text_parts)
+            logger.debug("PDF extraction complete: %d pages, %d total chars", len(reader.pages), len(result))
+            return result
         except ImportError:
             logger.warning("pypdf not installed, trying pdfplumber")
             return self._extract_pdf_pdfplumber(path)
@@ -145,12 +160,19 @@ class DocumentLoader:
         try:
             import docx
 
+            logger.debug("Extracting DOCX: %s", path.name)
             doc = docx.Document(str(path))
             text_parts = []
             for para in doc.paragraphs:
                 if para.text.strip():
                     text_parts.append(para.text)
-            return "\n\n".join(text_parts)
+            result = "\n\n".join(text_parts)
+            logger.debug(
+                "DOCX extraction complete: %d paragraphs, %d total chars",
+                len(text_parts),
+                len(result),
+            )
+            return result
         except ImportError:
             raise DocumentError("python-docx not installed")
 

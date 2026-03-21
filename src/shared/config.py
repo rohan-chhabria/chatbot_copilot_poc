@@ -152,7 +152,7 @@ INMATE_PIPELINE_TIMEOUT: int = int(os.environ.get("INMATE_PIPELINE_TIMEOUT", "30
 DOC_PIPELINE_TIMEOUT: int = int(os.environ.get("DOC_PIPELINE_TIMEOUT", "30"))
 DOC_CHROMA_DIR: str = os.environ.get("DOC_CHROMA_DIR", "./chroma_docs")
 DOC_EMBEDDING_MODEL: str = os.environ.get("DOC_EMBEDDING_MODEL", "text-embedding-3-small")
-DOC_RETRIEVAL_TOP_K: int = int(os.environ.get("DOC_RETRIEVAL_TOP_K", "10"))
+DOC_RETRIEVAL_TOP_K: int = int(os.environ.get("DOC_RETRIEVAL_TOP_K", "5"))
 DOC_HYBRID_SEARCH: bool = os.environ.get("DOC_HYBRID_SEARCH", "true").lower() == "true"
 DOC_RERANKING_ENABLED: bool = os.environ.get("DOC_RERANKING_ENABLED", "false").lower() == "true"
 

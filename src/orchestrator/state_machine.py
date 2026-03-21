@@ -56,17 +56,33 @@ class ScopeStateMachine:
 
         Returns response dict or routes to appropriate pipeline.
         """
+        logger.debug(
+            "handle_message: message=%r, session=%s, active_scope=%s",
+            message[:100],
+            session.session_id[:8],
+            session.active_scope,
+        )
+
         # 1. Check cross-scope handlers (greetings, recall, help)
         cross_scope_response = self._cross_scope.handle(message, session)
         if cross_scope_response:
+            logger.debug(
+                "Cross-scope handled: type=%s",
+                "greeting" if cross_scope_response.get("is_greeting") else
+                "farewell" if cross_scope_response.get("is_farewell") else
+                "help" if cross_scope_response.get("is_help") else
+                "recall" if cross_scope_response.get("is_recall") else "unknown",
+            )
             self._save_conversational_turn(session, message, cross_scope_response)
             return cross_scope_response
 
         # 2. No active scope? Prompt for selection
         if session.active_scope is None:
+            logger.debug("No active scope, prompting selection")
             return self._prompt_scope_selection(message, session)
 
         # 3. Route to active pipeline
+        logger.debug("Dispatching to pipeline: %s", session.active_scope)
         return await self._dispatch_to_pipeline(message, session)
 
     def select_scope(self, scope_id: str, session: Session) -> dict[str, Any]:
@@ -133,10 +149,23 @@ class ScopeStateMachine:
         session: Session,
     ) -> dict[str, Any]:
         """Dispatch to the active pipeline."""
+        logger.debug(
+            "Dispatching to pipeline: scope=%s, message=%r",
+            session.active_scope,
+            message[:80],
+        )
+
         pipeline = ScopeRegistry.get(session.active_scope)
         scope_context = session.get_scope_context()
 
+        logger.debug("Calling pipeline.process()...")
         response = await pipeline.process(message, session, scope_context)
+
+        logger.debug(
+            "Pipeline returned: row_count=%s, has_summary=%s",
+            response.get("row_count"),
+            bool(response.get("summary")),
+        )
 
         # Update scope context
         scope_context.add_query(message)
@@ -152,15 +181,27 @@ class ScopeStateMachine:
         session: Session,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Dispatch to pipeline with streaming."""
+        logger.debug(
+            "dispatch_stream: scope=%s, message=%r",
+            session.active_scope,
+            message[:80],
+        )
+
         if session.active_scope is None:
+            logger.debug("No scope selected, returning error")
             yield {"event": "error", "data": "Please select a scope first."}
             return
 
         pipeline = ScopeRegistry.get(session.active_scope)
         scope_context = session.get_scope_context()
 
+        logger.debug("Starting pipeline stream...")
+        event_count = 0
         async for event in pipeline.process_stream(message, session, scope_context):
+            event_count += 1
             yield event
+
+        logger.debug("Pipeline stream complete: %d events", event_count)
 
         # Update scope context after completion
         scope_context.add_query(message)

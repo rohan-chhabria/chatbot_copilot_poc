@@ -109,14 +109,29 @@ def _resolve_session(request: ChatRequest):
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
     """Main chat endpoint using orchestrator layer."""
+    logger.debug(
+        "POST /chat: question=%r, user=%s, session=%s",
+        request.question[:80],
+        request.user_id,
+        request.session_id[:12] if request.session_id else "new",
+    )
+
     _ensure_pipelines_registered()
     session = _resolve_session(request)
+    logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
+
     state_machine = _get_state_machine()
 
     try:
+        logger.debug("Calling state_machine.handle_message...")
         result = await state_machine.handle_message(
             message=request.question,
             session=session,
+        )
+        logger.debug(
+            "handle_message returned: row_count=%s, has_error=%s",
+            result.get("row_count"),
+            "error" in result,
         )
     except Exception as e:
         logger.exception("Pipeline error for session=%s", session.session_id)
@@ -142,8 +157,17 @@ async def chat(request: ChatRequest) -> ChatResponse:
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """SSE streaming endpoint using orchestrator layer."""
+    logger.debug(
+        "POST /chat/stream: question=%r, user=%s, session=%s",
+        request.question[:80],
+        request.user_id,
+        request.session_id[:12] if request.session_id else "new",
+    )
+
     _ensure_pipelines_registered()
     session = _resolve_session(request)
+    logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
+
     state_machine = _get_state_machine()
 
     async def event_generator():
@@ -155,6 +179,7 @@ async def chat_stream(request: ChatRequest):
         try:
             # If no active scope, handle with state machine (non-streaming)
             if session.active_scope is None:
+                logger.debug("No active scope, using non-streaming handler")
                 result = await state_machine.handle_message(
                     message=request.question,
                     session=session,
@@ -163,15 +188,19 @@ async def chat_stream(request: ChatRequest):
                 yield {"event": "result", "data": json.dumps(result)}
             else:
                 # Stream from active pipeline
+                logger.debug("Streaming from scope: %s", session.active_scope)
+                event_count = 0
                 async for event in state_machine.dispatch_stream(
                     message=request.question,
                     session=session,
                 ):
+                    event_count += 1
                     evt_name = event.get("event", "message")
                     payload = event.get("data", "")
                     if isinstance(payload, dict):
                         payload = json.dumps(payload)
                     yield {"event": evt_name, "data": payload}
+                logger.debug("Stream complete: %d events", event_count)
                 _get_session_store().save(session)
         except Exception as e:
             logger.exception("Stream error for session=%s", session.session_id)

@@ -59,17 +59,27 @@ class ValkeySessionStore(SessionStore):
 
     def get(self, session_id: str) -> Session | None:
         key = f"session:{session_id}"
+        logger.debug("ValkeySessionStore.get: %s", session_id[:12])
         data = self._client.get(key)
         if not data:
+            logger.debug("Session not found: %s", session_id[:12])
             return None
+        logger.debug("Session loaded: %s", session_id[:12])
         return Session.from_dict(json.loads(data))
 
     def save(self, session: Session) -> None:
         key = f"session:{session.session_id}"
+        logger.debug(
+            "ValkeySessionStore.save: %s (scope=%s, turns=%d)",
+            session.session_id[:12],
+            session.active_scope,
+            len(session.turns),
+        )
         self._client.setex(key, SESSION_TTL_SECONDS, json.dumps(session.to_dict()))
 
     def delete(self, session_id: str) -> None:
         key = f"session:{session_id}"
+        logger.debug("ValkeySessionStore.delete: %s", session_id[:12])
         self._client.delete(key)
 
 
@@ -80,18 +90,29 @@ class InMemorySessionStore(SessionStore):
         logger.info("Using in-memory session store (dev mode)")
 
     def get(self, session_id: str) -> Session | None:
+        logger.debug("InMemorySessionStore.get: %s", session_id[:12])
         data = self._store.get(session_id)
         if not data:
+            logger.debug("Session not found: %s", session_id[:12])
             return None
         if time.time() - data.get("last_active", 0) > SESSION_TTL_SECONDS:
+            logger.debug("Session expired: %s", session_id[:12])
             self.delete(session_id)
             return None
+        logger.debug("Session loaded: %s (scope=%s)", session_id[:12], data.get("active_scope"))
         return Session.from_dict(data)
 
     def save(self, session: Session) -> None:
+        logger.debug(
+            "InMemorySessionStore.save: %s (scope=%s, turns=%d)",
+            session.session_id[:12],
+            session.active_scope,
+            len(session.turns),
+        )
         self._store[session.session_id] = session.to_dict()
 
     def delete(self, session_id: str) -> None:
+        logger.debug("InMemorySessionStore.delete: %s", session_id[:12])
         self._store.pop(session_id, None)
 
 

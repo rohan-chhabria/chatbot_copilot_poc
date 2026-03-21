@@ -1,14 +1,17 @@
-# InmateCopilot — Intelligent Chatbot for Correctional Officers
+# InmateCopilot — Guided Multi-Capability Conversational Agent
 
-A multi-tenant, conversational AI chatbot that lets correctional facility officers
-query operational data using natural language. Built on **Vanna AI 2.0** (text-to-SQL),
-**FastAPI**, **Aurora MySQL** (read-only), and **AWS serverless** infrastructure.
+A multi-tenant, conversational AI system for correctional facility officers that combines **natural language SQL queries** (Vanna AI 2.0) with **document-based Q&A** (RAG with hybrid search). Officers explicitly select their intent through a guided interface, enabling strict scope isolation and context preservation.
+
+**Version**: 2.0 (Guided Conversational Agent)
 
 ---
 
 ## What This System Does
 
-Officers and wardens ask questions in plain English:
+InmateCopilot V2 provides two distinct capabilities through a guided UI:
+
+### 📊 Inmate Data Pipeline (SQL)
+Officers query operational data using natural language:
 
 | Question | What Happens |
 |----------|-------------|
@@ -17,25 +20,102 @@ Officers and wardens ask questions in plain English:
 | "Which facilities had the most refusals?" | Aggregates by facility → ranks by refusal count |
 | "Now show me just the red-highlighted ones" | Uses conversation context → adds highlighter filter |
 
-The system maintains **multi-turn conversations** (up to 15 turns per session),
-so follow-up questions reference previous results automatically.
+### 📄 Document QA Pipeline (RAG)
+Officers ask questions about policies, procedures, and documentation:
+
+| Question | What Happens |
+|----------|-------------|
+| "What is the attorney visit procedure?" | Hybrid search → retrieves relevant chunks → synthesizes answer |
+| "How do I document a fire drill?" | BM25 + semantic search → RRF fusion → LLM synthesis |
+| "Explain the restraint removal process" | Retrieves from indexed PDFs/DOCXs → formatted response with sources |
+
+The system maintains **multi-turn conversations** (up to 15 turns per session) with **scope isolation** — switching between pipelines preserves context for when you return.
 
 ---
 
 ## Architecture
 
+### High-Level Overview
+
 ```
-Officer App → API Gateway → FastAPI (Lambda/ECS) → Vanna AI 2.0 → Aurora MySQL
-                                 ↕                       ↕
-                            Valkey (Sessions)       ChromaDB (Training)
-                            DynamoDB (History)
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                                 CLIENT LAYER                                     │
+│    ┌─────────────┐  ┌─────────────────────────────────────────────────────┐    │
+│    │   Sarah     │  │  [📊 Inmate Data]  [📄 Documents]  ← Scope Selector │    │
+│    │   Avatar    │  │                                                      │    │
+│    └─────────────┘  │  Conversation Thread (scope-aware)                   │    │
+│                     └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              API LAYER (FastAPI)                                 │
+│   /chat  /chat/stream  /scope/select  /scope/options  /health  /train           │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                            ORCHESTRATOR LAYER                                    │
+│   ┌─────────────────┐  ┌─────────────────┐  ┌────────────────────────────────┐ │
+│   │ ScopeStateMachine│  │ ScopeRegistry   │  │ CrossScopeHandler              │ │
+│   │ - Active scope  │  │ - Pipeline map  │  │ - Greetings, help, recall      │ │
+│   │ - Scope switch  │  │ - Definitions   │  │ - Context preservation         │ │
+│   └─────────────────┘  └─────────────────┘  └────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                    ┌───────────────────┴───────────────────┐
+                    ▼                                       ▼
+┌───────────────────────────────────┐   ┌───────────────────────────────────────┐
+│      INMATE DATA PIPELINE         │   │         DOCUMENT QA PIPELINE          │
+│                                   │   │                                       │
+│  ┌─────────────────────────────┐  │   │  ┌─────────────────────────────────┐  │
+│  │ QuestionValidator           │  │   │  │ DocumentValidator               │  │
+│  │ (injection, domain check)   │  │   │  │ (length, relevance)             │  │
+│  └─────────────────────────────┘  │   │  └─────────────────────────────────┘  │
+│               │                   │   │               │                       │
+│  ┌─────────────────────────────┐  │   │  ┌─────────────────────────────────┐  │
+│  │ VannaAgent (Text-to-SQL)    │  │   │  │ DocumentRetriever               │  │
+│  │ - ChromaDB training data    │  │   │  │ - Semantic search (embeddings)  │  │
+│  │ - GPT-4o-mini generation    │  │   │  │ - BM25 keyword search           │  │
+│  └─────────────────────────────┘  │   │  │ - RRF fusion (top-k merge)      │  │
+│               │                   │   │  └─────────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │   │               │                       │
+│  │ SQLValidator                │  │   │  ┌─────────────────────────────────┐  │
+│  │ - Security checks           │  │   │  │ ResponseSynthesizer             │  │
+│  │ - Filter injection          │  │   │  │ - Context + question → LLM      │  │
+│  └─────────────────────────────┘  │   │  │ - Source attribution            │  │
+│               │                   │   │  └─────────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │   │               │                       │
+│  │ Aurora MySQL (read-only)    │  │   │  ┌─────────────────────────────────┐  │
+│  └─────────────────────────────┘  │   │  │ ChromaDB (vector store)         │  │
+│               │                   │   │  └─────────────────────────────────┘  │
+│  ┌─────────────────────────────┐  │   │                                       │
+│  │ ResponseFormatter           │  │   │                                       │
+│  │ (concise officer-friendly)  │  │   │                                       │
+│  └─────────────────────────────┘  │   │                                       │
+└───────────────────────────────────┘   └───────────────────────────────────────┘
+                    │                                       │
+                    └───────────────────┬───────────────────┘
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              STORAGE LAYER                                       │
+│   ┌─────────────────┐  ┌─────────────────┐  ┌────────────────────────────────┐ │
+│   │ Valkey          │  │ DynamoDB        │  │ ChromaDB                       │ │
+│   │ (Sessions/STM)  │  │ (History/LTM)   │  │ (Vanna training + Doc vectors) │ │
+│   └─────────────────┘  └─────────────────┘  └────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Multi-tenant**: Single deployment serves all clients. `customer_key` in each
-request routes to the correct Aurora MySQL database. Processing logic is shared;
-data isolation is strict.
+### Key Architectural Principles
 
-**Resource naming**: `InmateCopilot-{Resource}-{DeploymentId}-{Environment}`
+| Principle | Implementation |
+|-----------|----------------|
+| **Guided, Not Inferred** | User clicks to select scope; no AI guessing intent |
+| **Scope Isolation** | Each pipeline operates independently; no cross-contamination |
+| **Context Preservation** | Switching scopes preserves previous context for return |
+| **Modular Pipelines** | Each capability is self-contained via `Pipeline` base class |
+| **Multi-Tenant** | Strict data isolation per `customer_key` |
+| **Hybrid Search** | Semantic + BM25 with RRF fusion for document retrieval |
 
 ---
 
@@ -44,139 +124,256 @@ data isolation is strict.
 ```
 chatbot_copilot_poc/
 ├── .github/workflows/
-│   ├── ci.yml                    # Lint, test, validate on every push/PR
-│   └── cd.yml                    # Deploy to AWS (manual dispatch)
+│   ├── ci.yml                           # Lint, test, validate on push/PR
+│   └── cd.yml                           # Deploy to AWS (manual dispatch)
+│
 ├── docs/
-│   └── architecture_flow.md      # Detailed architecture diagrams
+│   ├── ARCHITECTURE.md                  # System architecture diagrams
+│   ├── IMPLEMENTATION_PLAN.md           # V2 migration phases
+│   ├── INFRASTRUCTURE_ANALYSIS.md       # AWS cost analysis
+│   ├── SYSTEM_FLOWS.md                  # Detailed flow diagrams
+│   ├── USAGE_GUIDE.md                   # How to use the application
+│   └── V1_V2_SCOPE.md                   # V1→V2 scope comparison
+│
 ├── infra/
-│   ├── template.yaml             # SAM/CloudFormation (DynamoDB, Lambda, API GW)
-│   └── samconfig.toml            # SAM CLI config
+│   ├── template.yaml                    # SAM/CloudFormation
+│   └── samconfig.toml                   # SAM CLI config
+│
+├── local/
+│   ├── server.py                        # Local development server
+│   ├── bootstrap.py                     # Environment setup
+│   └── test_conversations.py            # Manual testing scripts
+│
+├── scripts/
+│   └── train_vanna.py                   # Vanna ChromaDB training CLI
+│
 ├── src/
-│   ├── shared/                   # Config, constants, logging
-│   │   ├── config.py             # All settings from env vars
-│   │   ├── constants.py          # Domain constants (sensitive cols, filters)
-│   │   └── logger.py             # Structured logging factory
-│   ├── api/                      # FastAPI endpoints
-│   │   ├── handler.py            # Lambda/Uvicorn entry point
-│   │   ├── routes.py             # POST /chat, GET /health, /session, /history
-│   │   ├── middleware.py         # Request logging, CORS
-│   │   └── schemas.py            # Pydantic request/response models
-│   ├── agent/                    # Vanna AI integration
-│   │   ├── vanna_agent.py        # SQL generation pipeline + retry logic
-│   │   ├── prompt_builder.py     # Context-aware prompt construction
-│   │   └── response_formatter.py # Convert SQL results to officer-friendly text
-│   ├── guardrails/               # Input/output validation
-│   │   ├── question_validator.py # Injection detection, domain relevance
-│   │   └── sql_validator.py      # SQL security checks, filter injection
-│   ├── session/                  # Short-term memory
-│   │   └── session_manager.py    # Valkey-backed sessions (in-memory fallback)
-│   ├── memory/                   # Long-term memory
-│   │   └── conversation_store.py # DynamoDB conversation history
-│   ├── tenant/                   # Multi-tenant routing
-│   │   ├── tenant_router.py      # customer_key → DB connection resolver
-│   │   └── db_registry.py        # Connection pool per tenant
-│   ├── training/                 # ChromaDB training data
-│   │   ├── trainer.py            # Load Q&A pairs + documentation
-│   │   └── data/                 # JSON training files
-│   └── tools/                    # Pre-built domain queries
-│       ├── compliance_tool.py    # 30-min rounds, Fire Watch, refusals
-│       └── facility_tool.py      # Facility summaries, officer activity
+│   ├── api/
+│   │   ├── handlers/
+│   │   │   ├── chat_handler.py          # Chat orchestration
+│   │   │   └── scope_handler.py         # Scope selection/switching
+│   │   ├── handler.py                   # Lambda/Uvicorn entry point
+│   │   ├── routes.py                    # All API endpoints
+│   │   ├── schemas.py                   # Pydantic request/response models
+│   │   └── middleware.py                # Request logging, CORS
+│   │
+│   ├── orchestrator/                    # NEW: V2 Orchestration Layer
+│   │   ├── state_machine.py             # ScopeStateMachine (dispatch, context)
+│   │   ├── scope_registry.py            # ScopeRegistry (pipeline mapping)
+│   │   ├── cross_scope.py               # CrossScopeHandler (greetings, help)
+│   │   └── tests/                       # Orchestrator unit tests
+│   │
+│   ├── pipelines/
+│   │   ├── base.py                      # Pipeline abstract base class
+│   │   │
+│   │   ├── inmate_data/                 # SQL Pipeline (migrated from agent/)
+│   │   │   ├── pipeline.py              # InmateDataPipeline
+│   │   │   ├── vanna_agent.py           # Vanna AI 2.0 integration
+│   │   │   ├── intent_engine.py         # Intent detection
+│   │   │   ├── prompt_builder.py        # Context-aware prompts
+│   │   │   ├── response_formatter.py    # Officer-friendly formatting
+│   │   │   ├── sarah_brain.py           # Personality/greeting logic
+│   │   │   ├── guardrails/
+│   │   │   │   ├── question_validator.py # Input validation
+│   │   │   │   └── sql_validator.py      # SQL security checks
+│   │   │   └── tests/                   # Pipeline-specific tests
+│   │   │
+│   │   └── document_qa/                 # NEW: RAG Pipeline
+│   │       ├── pipeline.py              # DocumentQAPipeline
+│   │       ├── retriever.py             # Hybrid search (semantic + BM25)
+│   │       ├── synthesizer.py           # LLM response synthesis
+│   │       ├── indexer.py               # Document indexing utilities
+│   │       ├── documents/
+│   │       │   ├── loader.py            # PDF/DOCX text extraction
+│   │       │   ├── chunker.py           # Recursive text chunking
+│   │       │   ├── store.py             # TenantDocumentStore (ChromaDB)
+│   │       │   └── models.py            # Document/Chunk data classes
+│   │       ├── guardrails/
+│   │       │   └── validator.py         # Document question validation
+│   │       └── tests/                   # Document pipeline tests
+│   │
+│   ├── session/
+│   │   ├── models.py                    # Session model with scope context
+│   │   └── session_manager.py           # Valkey-backed session store
+│   │
+│   ├── memory/
+│   │   └── conversation_store.py        # DynamoDB conversation history
+│   │
+│   ├── tenant/
+│   │   ├── tenant_router.py             # customer_key → DB resolver
+│   │   └── db_registry.py               # Connection pool per tenant
+│   │
+│   ├── training/
+│   │   ├── trainer.py                   # ChromaDB training data loader
+│   │   └── data/                        # JSON training files
+│   │
+│   ├── tools/
+│   │   ├── compliance_tool.py           # Pre-built compliance queries
+│   │   └── facility_tool.py             # Facility summary queries
+│   │
+│   └── shared/
+│       ├── config.py                    # Centralized configuration
+│       ├── constants.py                 # Domain constants
+│       ├── exceptions.py                # Custom exception classes
+│       └── logger.py                    # Structured logging factory
+│
+├── static/
+│   └── index.html                       # Web UI with scope selection
+│
 ├── tests/
-│   ├── conftest.py               # Shared fixtures (mock AWS, sessions)
-│   ├── unit/                     # 6 test modules, 73 tests
-│   │   ├── test_question_validator.py
-│   │   ├── test_sql_validator.py
-│   │   ├── test_session_manager.py
-│   │   ├── test_tenant_router.py
-│   │   ├── test_prompt_builder.py
-│   │   └── test_response_formatter.py
-│   └── integration/              # 2 test modules, 27 tests
-│       ├── test_api_endpoints.py
-│       └── test_agent_pipeline.py
-├── tools/
-│   └── seed_training.py          # One-time ChromaDB training data loader
-├── .env.example                  # Template for environment variables
+│   ├── conftest.py                      # Shared fixtures
+│   ├── unit/                            # Unit tests
+│   └── integration/                     # Integration tests
+│
+├── .env.example                         # Environment variable template
 ├── .gitignore
-├── Makefile                      # install, lint, test, run, validate
-├── pyproject.toml                # pytest, ruff, mypy config
-├── requirements.txt              # Production dependencies
-└── requirements-dev.txt          # Dev/test dependencies
+├── Makefile                             # install, lint, test, run
+├── pyproject.toml                       # pytest, ruff, mypy config
+├── requirements.txt                     # Production dependencies
+└── requirements-dev.txt                 # Dev/test dependencies
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Create Virtual Environment (Vanna 2.0)
+### 1. Create Virtual Environment
 
 ```bash
-python3 -m venv venv_vanna_v2
-source venv_vanna_v2/bin/activate
-
-pip install 'vanna>=2.0.0' chromadb openai pymysql cryptography \
-  fastapi mangum uvicorn pydantic pydantic-settings boto3 redis \
-  httpx moto pytest pytest-asyncio sse-starlette python-dotenv ruff \
-  google-genai  # Optional: for Gemini LLM provider
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -r requirements-dev.txt  # For testing
 ```
 
 ### 2. Configure Environment
 
 ```bash
 cp .env.example .env
-# Edit .env with your API keys and DB credentials
-# LLM_PROVIDER=openai (default, recommended) or LLM_PROVIDER=gemini
+# Edit .env with your configuration:
+#   - OPENAI_API_KEY (required for both pipelines)
+#   - Database credentials (for Inmate Data pipeline)
+#   - LLM_PROVIDER=openai (default)
+#   - LOG_LEVEL=DEBUG (for detailed logging)
 ```
 
-### 3. Train ChromaDB (Required for First Run)
+### 3. Train Vanna ChromaDB (Required for SQL Pipeline)
 
 ```bash
+# Using the training script
+python scripts/train_vanna.py --stats  # View current stats
+python scripts/train_vanna.py --train  # Load training data
+
+# Or programmatically
 PYTHONPATH=. python3 -c "from src.training.trainer import train_from_defaults; print(train_from_defaults())"
 ```
 
-### 4. Run Tests
+### 4. Index Documents (Required for Document QA Pipeline)
 
-```bash
-PYTHONPATH=. python3 -m pytest tests/ -v
+```python
+# Using the indexer programmatically
+from src.pipelines.document_qa.indexer import index_file, index_directory
+
+# Index a single file
+await index_file("/path/to/document.pdf", customer_key="demo")
+
+# Index a directory
+await index_directory("/path/to/docs/", customer_key="demo")
+
+# Check index stats
+from src.pipelines.document_qa.indexer import get_index_stats
+stats = get_index_stats(customer_key="demo")
+print(f"Total chunks: {stats['total_chunks']}")
 ```
 
-### 5. Run Locally
+### 5. Run the Server
 
 ```bash
+# Local development server
+python -m local.server
+
+# Or with uvicorn directly
 PYTHONPATH=. uvicorn src.api.handler:app --reload --host 0.0.0.0 --port 8000
-# API at http://localhost:8000
-# Docs at http://localhost:8000/docs
 ```
 
-### 6. Test Chat
+### 6. Access the Application
+
+- **Web UI**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Health Check**: http://localhost:8000/health
+
+### 7. Run Tests
 
 ```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question":"How many notes were added yesterday?","customer_key":"demo","user_id":"test.user"}'
-```
+# All tests
+PYTHONPATH=. pytest tests/ -v
 
-### 7. Test Streaming
-
-```bash
-curl -N -X POST http://localhost:8000/chat/stream \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Top 5 keywords this month?","customer_key":"demo","user_id":"test.user"}'
+# Specific test suites
+PYTHONPATH=. pytest src/orchestrator/tests/ -v      # Orchestrator tests
+PYTHONPATH=. pytest src/pipelines/inmate_data/tests/ -v  # SQL pipeline tests
+PYTHONPATH=. pytest src/pipelines/document_qa/tests/ -v  # Document pipeline tests
 ```
 
 ---
 
 ## API Endpoints
 
-### POST /chat — Main Conversation Endpoint
+### Core Endpoints
 
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/chat` | POST | Main conversation endpoint (scope-aware) |
+| `/chat/stream` | POST | Streaming conversation (SSE) |
+| `/scope/select` | POST | Select active scope |
+| `/scope/options` | GET | Get available scopes |
+| `/health` | GET | Health check |
+| `/train` | POST | Trigger Vanna training |
+
+### POST /chat — Main Conversation
+
+**Request:**
 ```json
 {
     "question": "How many inmates are on Fire Watch?",
     "customer_key": "demo",
-    "user_id": "Richard.Bell",
+    "user_id": "richard.bell",
     "session_id": null,
-    "facility_ids": [101, 102],
-    "role": "officer"
+    "facility_ids": [101, 102]
+}
+```
+
+**Response (with active scope):**
+```json
+{
+    "success": true,
+    "session_id": "a1b2c3d4-...",
+    "summary": "Found 45 inmates on Fire Watch across 3 facilities.",
+    "data": [{"facility": "Main Block", "count": 20}],
+    "row_count": 3,
+    "sql": "SELECT f.facility, COUNT(*) ...",
+    "scope": "inmate_data"
+}
+```
+
+**Response (no scope selected):**
+```json
+{
+    "requires_scope": true,
+    "greeting": "Hello! I'm Sarah, your correctional facility assistant.",
+    "options": [
+        {"id": "inmate_data", "name": "Inmate Data", "description": "Query operational data"},
+        {"id": "document_qa", "name": "Documents", "description": "Search policies and procedures"}
+    ]
+}
+```
+
+### POST /scope/select — Select Scope
+
+**Request:**
+```json
+{
+    "session_id": "a1b2c3d4-...",
+    "scope_id": "document_qa"
 }
 ```
 
@@ -184,48 +381,123 @@ curl -N -X POST http://localhost:8000/chat/stream \
 ```json
 {
     "success": true,
-    "session_id": "a1b2c3d4-...",
-    "summary": "Found 45 inmates on Fire Watch across 3 facilities.",
-    "data": [{"facility": "Main Block", "count": 20}, ...],
-    "row_count": 3,
-    "sql": "SELECT f.facility, COUNT(*) ...",
-    "error": ""
+    "scope": "document_qa",
+    "message": "📄 Documents scope selected. Ask me about policies and procedures."
 }
 ```
 
-### GET /health — Health Check
+---
 
-```json
-{"status": "healthy", "version": "1.0.0", "environment": "dev"}
+## Document QA Pipeline
+
+### Indexing Documents
+
+The Document QA pipeline requires documents to be indexed before querying:
+
+```python
+from src.pipelines.document_qa.indexer import DocumentIndexer
+
+# Initialize indexer
+indexer = DocumentIndexer(customer_key="demo")
+
+# Index a PDF
+result = await indexer.index_file("/path/to/manual.pdf")
+print(f"Indexed {result['chunks']} chunks from {result['filename']}")
+
+# Index a directory of documents
+results = await indexer.index_directory("/path/to/docs/", recursive=True)
+for r in results:
+    print(f"  {r['filename']}: {r['chunks']} chunks")
 ```
 
-### GET /session/{session_id} — Session Details
+### Supported File Types
 
-Returns session metadata: turn count, user, timestamps.
+| Format | Extension | Library |
+|--------|-----------|---------|
+| PDF | `.pdf` | pypdf |
+| Word | `.docx` | python-docx |
+| Text | `.txt` | Built-in |
+| Markdown | `.md` | Built-in |
 
-### GET /history?customer_key=demo&user_id=Richard.Bell — Conversation History
+### Hybrid Search Architecture
 
-Returns past conversation turns from DynamoDB.
+The retriever uses a three-stage hybrid search:
+
+1. **Semantic Search**: OpenAI embeddings (`text-embedding-3-small`) → ChromaDB vector similarity
+2. **BM25 Search**: Tokenized keyword matching with Okapi BM25 scoring
+3. **RRF Fusion**: Reciprocal Rank Fusion merges results with `k=60`
+
+```
+Query: "attorney visit procedure"
+                    │
+    ┌───────────────┴───────────────┐
+    ▼                               ▼
+┌─────────────┐             ┌─────────────┐
+│  Semantic   │             │    BM25     │
+│  (top 20)   │             │  (top 20)   │
+└─────────────┘             └─────────────┘
+    │                               │
+    └───────────────┬───────────────┘
+                    ▼
+            ┌─────────────┐
+            │ RRF Fusion  │
+            │  (top 5)    │
+            └─────────────┘
+                    │
+                    ▼
+            ┌─────────────┐
+            │ Synthesizer │
+            │ (GPT-4o)    │
+            └─────────────┘
+```
 
 ---
 
-## Multi-Tenant Architecture
+## Configuration
 
-| Aspect | Implementation |
-|--------|---------------|
-| Tenant ID | `customer_key` from request body |
-| DB Routing | `customer_key` → tenant-specific Aurora MySQL endpoint |
-| Data Isolation | Each tenant has its own database instance |
-| Session Keys | Prefixed with `customer_key` in Valkey |
-| History | DynamoDB partitioned by `customer_key#user_id` |
-| Shared Logic | SQL generation, guardrails, formatting — identical |
+### Environment Variables
 
-Configure tenants via `TENANT_DB_MAP` environment variable (JSON):
+| Variable | Default | Description |
+|----------|---------|-------------|
+| **General** | | |
+| `ENVIRONMENT` | `dev` | Environment (dev/staging/prod) |
+| `LOG_LEVEL` | `INFO` | Logging level (DEBUG/INFO/WARNING/ERROR) |
+| **LLM** | | |
+| `OPENAI_API_KEY` | — | OpenAI API key (required) |
+| `LLM_PROVIDER` | `openai` | LLM provider |
+| `LLM_MODEL` | `gpt-4o-mini` | Model for SQL generation |
+| `DOC_LLM_MODEL` | `gpt-4o-mini` | Model for document synthesis |
+| **Database** | | |
+| `TENANT_DB_MAP` | `{}` | JSON map of tenant DB configs |
+| **Storage** | | |
+| `CHROMA_STORAGE_DIR` | `./chroma_db` | Vanna training ChromaDB path |
+| `DOC_CHROMA_DIR` | `./chroma_docs` | Document vectors ChromaDB path |
+| `VALKEY_HOST` | `localhost` | Session store host |
+| `DYNAMODB_TABLE` | — | Conversation history table |
+| **Document QA** | | |
+| `DOC_CHUNK_SIZE` | `512` | Document chunk size (chars) |
+| `DOC_CHUNK_OVERLAP` | `50` | Chunk overlap (chars) |
+| `DOC_TOP_K` | `5` | Number of chunks to retrieve |
+| `DOC_PIPELINE_TIMEOUT` | `30` | Pipeline timeout (seconds) |
+
+### Multi-Tenant Configuration
 
 ```json
 {
-    "demo": {"host": "demo-db.cluster-ro-xxx.rds.amazonaws.com", "database": "Demo_aurora", "user": "reader", "password": "xxx", "port": 3306},
-    "gdc-prod": {"host": "gdc-db.cluster-ro-xxx.rds.amazonaws.com", "database": "GDC_aurora", "user": "reader", "password": "xxx", "port": 3306}
+    "demo": {
+        "host": "demo-db.cluster-ro-xxx.rds.amazonaws.com",
+        "database": "Demo_aurora",
+        "user": "reader",
+        "password": "xxx",
+        "port": 3306
+    },
+    "gdc-prod": {
+        "host": "gdc-db.cluster-ro-xxx.rds.amazonaws.com",
+        "database": "GDC_aurora",
+        "user": "reader",
+        "password": "xxx",
+        "port": 3306
+    }
 }
 ```
 
@@ -233,219 +505,104 @@ Configure tenants via `TENANT_DB_MAP` environment variable (JSON):
 
 ## Security & Guardrails
 
-### Question Validation
+### Inmate Data Pipeline (SQL)
+
+**Question Validation:**
 - SQL injection detection (UNION, OR 1=1, leetspeak normalization)
 - Schema exposure prevention (information_schema, SHOW TABLES)
 - Sensitive data request blocking (password, SSN)
 - Domain relevance checking (rejects weather, sports, etc.)
 - Length limits (5-1000 characters)
 
-### SQL Validation
+**SQL Validation:**
 - SELECT/WITH only (no DDL, DML, stored procedures)
-- Sensitive column filtering (password, salt, ssn, signature, lat/long)
-- Mandatory `status = 1` filter injection for all active-record tables
-- Facility-level data isolation via `facilities_id IN (...)` injection
-- REGEXP → LIKE conversion for MySQL compatibility
+- Sensitive column filtering (password, salt, ssn, signature)
+- Mandatory `status = 1` filter injection
+- Facility-level isolation via `facilities_id IN (...)`
+- REGEXP → LIKE conversion for MySQL
 - Balanced parentheses validation
-- SELECT * wrapper removal
+
+### Document QA Pipeline (RAG)
+
+**Question Validation:**
+- Length limits (3-2000 characters)
+- Relevance checking for document context
+- Empty/whitespace rejection
+
+**Response Synthesis:**
+- Source attribution required
+- Context-grounded answers only
+- No hallucination of document content
 
 ---
 
-## Infrastructure (AWS SAM)
+## Debug Logging
 
-### Resources Created
-
-| Resource | Name Pattern |
-|----------|-------------|
-| DynamoDB Table | `InmateCopilot-Conversations-{deploy_id}-{env}` |
-| Lambda Function | `InmateCopilot-Chatbot-{deploy_id}-{env}` |
-| API Gateway | `InmateCopilot-{deploy_id}-{env}` |
-| CloudWatch Alarms | Error rate, duration, DynamoDB throttling |
-
-### Deploy
+Enable comprehensive debug logging to troubleshoot issues:
 
 ```bash
-# Generate deployment ID (once per server)
-python3 -c "import uuid; print(uuid.uuid4().hex[:10])"
+# Set in .env
+LOG_LEVEL=DEBUG
 
-# Deploy
-sam build --template infra/template.yaml
-sam deploy \
-    --stack-name "InmateCopilot-V1-dev" \
-    --capabilities CAPABILITY_IAM \
-    --parameter-overrides "Environment=dev DeploymentId=a1b2c3d4e5"
+# Or export directly
+export LOG_LEVEL=DEBUG
+python -m local.server
 ```
 
-### Validate Template
+Debug logs are available for:
+
+| Component | Log Prefix | What It Logs |
+|-----------|------------|--------------|
+| API Routes | `src.api.routes` | Request/response, session resolution |
+| Orchestrator | `src.orchestrator.state_machine` | Scope dispatch, message handling |
+| Session Manager | `src.session.session_manager` | Session get/save/delete |
+| Document Retriever | `src.pipelines.document_qa.retriever` | BM25 scores, semantic scores, RRF fusion |
+| Document Synthesizer | `src.pipelines.document_qa.synthesizer` | Context length, chunk details, LLM calls |
+| Document Indexer | `src.pipelines.document_qa.indexer` | Chunking, embedding, storage |
+| Document Loader | `src.pipelines.document_qa.documents.loader` | PDF/DOCX extraction |
+| Inmate Pipeline | `src.pipelines.inmate_data.pipeline` | Vanna agent calls, SQL generation |
+
+---
+
+## Testing
+
+### Test Structure
+
+```
+tests/
+├── conftest.py                          # Shared fixtures
+├── unit/
+│   ├── test_question_validator.py       # 17 tests
+│   ├── test_sql_validator.py            # 14 tests
+│   ├── test_session_manager.py          # 11 tests
+│   ├── test_tenant_router.py            # 8 tests
+│   ├── test_prompt_builder.py           # 7 tests
+│   └── test_response_formatter.py       # 11 tests
+└── integration/
+    ├── test_api_endpoints.py            # 9 tests
+    └── test_agent_pipeline.py           # 13 tests
+
+src/
+├── orchestrator/tests/                  # Orchestrator unit tests
+├── pipelines/inmate_data/tests/         # SQL pipeline tests
+└── pipelines/document_qa/tests/         # Document pipeline tests
+```
+
+### Running Tests
 
 ```bash
-make validate
+# All tests
+PYTHONPATH=. pytest -v
+
+# With coverage
+PYTHONPATH=. pytest --cov=src --cov-report=html
+
+# Specific module
+PYTHONPATH=. pytest src/pipelines/document_qa/tests/ -v
+
+# Integration tests only
+PYTHONPATH=. pytest tests/integration/ -v
 ```
-
----
-
-## CI/CD Pipelines
-
-### CI (`.github/workflows/ci.yml`)
-- **Triggers**: Push/PR to `main`, `develop`
-- **Matrix**: Python 3.10, 3.12
-- **Steps**: Install → Ruff lint → Mypy → Pytest → SAM validate
-
-### CD (`.github/workflows/cd.yml`)
-- **Trigger**: Manual dispatch (pick dev/staging/prod)
-- **Steps**: Checkout → SAM build → AWS OIDC auth → SAM deploy
-- **Secrets**: `AWS_DEPLOY_ROLE_ARN`, `DEPLOYMENT_ID`
-
----
-
-## Test Results
-
-### Unit + Integration (100/100 pass, 0.50s)
-
-```
-tests/unit/test_question_validator.py    — 17 tests (valid, invalid, security, sanitization)
-tests/unit/test_sql_validator.py         — 14 tests (valid, invalid, fixes, injection)
-tests/unit/test_session_manager.py       — 11 tests (create, turns, serialization, store)
-tests/unit/test_tenant_router.py         —  8 tests (resolve, strict, list)
-tests/unit/test_prompt_builder.py        —  7 tests (question, SQL, response prompts)
-tests/unit/test_response_formatter.py    — 11 tests (data, analytics, empty, error, serialize)
-tests/integration/test_api_endpoints.py  —  9 tests (health, chat, session, history)
-tests/integration/test_agent_pipeline.py — 13 tests (helpers, pipeline, guardrails, retry)
-
-Lint (ruff): All checks passed!
-```
-
-### End-to-End — Batch 1: Priority Queries (15 queries)
-
-All against real Aurora MySQL, GPT-4o-mini, facilities [47, 63, 62].
-
-| # | Question | Status | Rows | Time |
-|---|----------|--------|------|------|
-| 1 | top users who added max notes in last 60 days | OK | 0 | 4.2s |
-| 2 | top active notes used in last 30 days along with notes count | OK | 500 | 2.1s |
-| 3 | all entries for inmate alester king in last 30 days | OK | 2 | 2.9s |
-| 4 | security related entries | OK | 0 | 2.2s |
-| 5 | last entry for meal | OK | 1 | 1.7s |
-| 6 | retrieve notes for fire watch, suicide watch and fight in last 45 days | OK | 0 | 2.9s |
-| 7 | entries for inventory | OK | 500 | 2.9s |
-| 8 | red marked entries in last 30 days | OK | 8 | 2.0s |
-| 9 | when was the last round conducted? | OK | 1 | 1.4s |
-| 10 | entries highlighted with red added in last month | OK | 8 | 1.7s |
-| 11 | show me all the inactive user's notes for last 6 months | OK | 0 | 1.7s |
-| 12 | data related to visitor log for last 30 days | OK | 0 | 1.7s |
-| 13 | list out all inmates, current status, facility and room number | OK | 0 | 2.2s |
-| 14 | list out all the inmate movement in last 7 days | OK | 0 | 1.7s |
-| 15 | last 5 status change for inmate anthony | OK | 0 | 2.9s |
-
-**Result: 15/15 OK, 0 errors, 8 with data, avg 2.3s**
-
-### End-to-End — Batch 2: Extended Queries (20 queries)
-
-| # | Question | Status | Rows | Time |
-|---|----------|--------|------|------|
-| 1 | show me last note added for inmate anthony | OK | 1 | 5.1s |
-| 2 | currently where is inmate anthony | OK | 0 | 2.3s |
-| 3 | where is inmate heath bould right now | OK | 0 | 2.2s |
-| 4 | all entries for inmate anthony nova added on 23 jan 2026 | OK | 0 | 3.4s |
-| 5 | in last week show all status change for inmate Anthony nova | OK | 0 | 2.7s |
-| 6 | retrieve entries between 9 AM to 11 AM on jan 23, 2026 | OK | 0 | 3.0s |
-| 7 | entries added in last 48 hours | OK | 500 | 2.3s |
-| 8 | show notes from yesterday | OK | 0 | 1.8s |
-| 9 | fetch all entries for movement added in last 7 days | OK | 113 | 3.0s |
-| 10 | list all movements this month | OK | 122 | 3.3s |
-| 11 | show all medical notes today | OK | 217 | 2.0s |
-| 12 | count fire watch notes this week | OK | 1 | 2.1s |
-| 13 | show all disciplinary notes this month | OK | 500 | 2.5s |
-| 14 | top 5 officers by note count this month | OK | 0 | 2.3s |
-| 15 | how many inmates are in cell 49 | OK | 1 | 1.3s |
-| 16 | show me all notes for inmate with booking number P01112850 | OK | 0 | 3.2s |
-| 17 | show notes created by user Anks today | OK | 0 | 2.4s |
-| 18 | list all notes by officer Richard Bell this week | OK | 0 | 2.6s |
-| 19 | show medical notes for inmate anthony in last 7 days | OK | 129 | 3.6s |
-| 20 | list all inmates in facility 01-Facility Master | OK | 0 | 2.2s |
-
-**Result: 20/20 OK, 0 errors, 9 with data, avg 2.7s**
-
-### Multi-Turn Conversation (7 turns, same session)
-
-| Turn | Question | Rows | Time | Context Used |
-|------|----------|------|------|-------------|
-| 1 | show me red highlighted notes from last 30 days | 8 | 3.7s | - |
-| 2 | who added most of those notes? | 0 | 1.8s | Referenced turn 1 |
-| 3 | show me the latest one in detail | 0 | 1.9s | Referenced turns 1-2 |
-| 4 | what keywords are associated with fire watch notes this month? | 5 | 1.9s | Topic pivot |
-| 5 | how many notes were added yesterday? | 1 | 1.3s | Independent |
-| 6 | show me the ones from inmate anthony nova | 0 | 3.4s | Referenced turn 5 |
-| 7 | what was the last movement for that inmate? | 31 | 3.3s | Referenced turn 6 |
-
-Session accumulated 14 turns (7 user + 7 assistant). Follow-up references
-("those notes", "the latest one", "that inmate") generated contextually correct SQL.
-
-### Smart Response Formatting
-
-Example outputs from the new concise formatter:
-
-```
-Q: "red marked entries in last 30 days"
-> 8 notes (Mar 03 → Mar 12).
-> Top authors: User#Anks (5), User#Bill.Allen (2), User#Utpal.Dutta (1)
-
-Q: "count fire watch notes this week"
-> Fire Watch Notes Count: 702
-
-Q: "how many inmates are in cell 49"
-> Inmate Count: 1
-
-Q: "entries added in last 48 hours"
-> 500 notes (Mar 13 → Mar 15).
-```
-
-### SSE Streaming
-
-Event flow verified: `session` → `status: Validating` → `status: Generating SQL` →
-`sql` (actual SQL shown) → `status: Executing` → `result` (full JSON) → `done`.
-
-### API Endpoints
-
-| Endpoint | Method | Status |
-|----------|--------|--------|
-| `/health` | GET | 200 OK |
-| `/chat` | POST | 200 OK (creates session, returns results) |
-| `/chat/stream` | POST | 200 OK (SSE event stream) |
-| `/session/{id}` | GET | 200 OK (session details) |
-| `/history` | GET | 200 OK (conversation history) |
-| `/train` | POST | 200 OK (triggers ChromaDB training) |
-| `/docs` | GET | Swagger UI (dev/staging only) |
-
-### Training Data
-
-ChromaDB loaded with **321 entries**:
-- 204 production question-SQL pairs
-- 69 domain documentation entries
-- 11 DDL schema definitions for key tables
-- 8 critical keyword/column mapping docs
-- 11 additional keyword-specific examples
-- 18 critical schema correction + query pattern examples
-
----
-
-## Database Schema (25 Core Tables)
-
-Central table `dg_notes` (50K+ officer log entries) with child tables:
-
-| Table | Rows | Purpose |
-|-------|------|---------|
-| `dg_notes` | 50,696 | Officer notes/logs |
-| `dg_notes_by_keyword` | 490,366 | Fire Watch, Rounds, Suicide Watch |
-| `dg_notes_tags` | 323,624 | Notes-to-inmate linkage |
-| `dg_tags` | 3,006 | Inmate master table |
-| `dg_facilities` | 346 | Facilities/dorms |
-| `dg_user` | 249 | Officers |
-| `dg_shift` | 9 | Work shifts |
-| `dg_highlighter` | 7 | Color-coded priorities |
-
-**Mandatory rules**: `status = 1` for active records, `LIMIT 500` default,
-never expose sensitive columns.
 
 ---
 
@@ -453,61 +610,133 @@ never expose sensitive columns.
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Text-to-SQL | Vanna AI 2.0.2 | NL → SQL generation with ChromaDB memory |
-| LLM (default) | OpenAI GPT-4o-mini | SQL generation — best accuracy + speed balance |
-| LLM (optional) | Google Gemini 2.x Flash | Configurable via `LLM_PROVIDER=gemini` |
-| API | FastAPI + Mangum | REST API + SSE streaming for Lambda/Uvicorn |
-| Database | Aurora MySQL | Read-only operational data |
-| Sessions | Valkey (ElastiCache) | Short-term conversation context |
-| History | DynamoDB | Long-term conversation persistence |
-| Vectors | ChromaDB | Training data embeddings |
-| Infra | AWS SAM | DynamoDB, Lambda, API Gateway |
-| CI/CD | GitHub Actions | Lint, test, deploy |
-| Tests | pytest + moto | Unit + integration + mock AWS |
+| **Text-to-SQL** | Vanna AI 2.0.2 | NL → SQL generation with ChromaDB memory |
+| **Document QA** | RAG (Hybrid Search) | Semantic + BM25 with RRF fusion |
+| **LLM** | OpenAI GPT-4o-mini | SQL generation + document synthesis |
+| **Embeddings** | OpenAI text-embedding-3-small | Document and query vectors |
+| **API** | FastAPI + Mangum | REST API + SSE streaming |
+| **Database** | Aurora MySQL | Read-only operational data |
+| **Vector Store** | ChromaDB | Training data + document embeddings |
+| **Sessions** | Valkey (ElastiCache) | Short-term conversation context |
+| **History** | DynamoDB | Long-term conversation persistence |
+| **PDF Parsing** | pypdf | PDF text extraction |
+| **DOCX Parsing** | python-docx | Word document extraction |
+| **BM25** | rank-bm25 | Keyword search scoring |
+| **Infra** | AWS SAM | DynamoDB, Lambda, API Gateway |
+| **CI/CD** | GitHub Actions | Lint, test, deploy |
+| **Tests** | pytest + moto | Unit + integration + mock AWS |
 
 ---
 
-## Performance Benchmarks
+## Dependencies
 
-### LLM Provider Comparison (35+ queries tested)
+### Production (requirements.txt)
 
-| Metric | GPT-4o-mini | Gemini 2.5 Flash | Gemini 2.5 Flash Lite |
-|--------|-------------|------------------|----------------------|
-| Success rate | **35/35 (100%)** | **0/7 (0%)** | **0/10 (0%)** |
-| Avg response | 2.3s | 5.1s | 2.1s |
-| Instruction following | Raw SQL only | Explanations + SQL | Explanations + SQL |
-| Schema accuracy | Correct | Hallucinated | Hallucinated |
-| MySQL compatibility | Native MySQL | PostgreSQL/SQLite syntax | SQLite syntax |
-| Free tier rate limit | 500 RPM | 5 RPM | 10 RPM |
+```
+vanna[chromadb,mysql]
+fastapi>=0.115.0
+mangum>=0.19.0
+uvicorn>=0.32.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pymysql>=1.1.0
+cryptography>=43.0.0
+boto3>=1.35.0
+redis>=5.0.0
+litellm>=1.50.0
+sse-starlette>=2.0.0
+moto[dynamodb]>=5.0.0
+python-dotenv>=1.0.0
 
-**Why Gemini fails for this use case:**
-- Ignores "raw SQL only" instruction — returns verbose explanations
-- Uses `DATE('now', '-30 days')` (SQLite) instead of MySQL `DATE_SUB()`
-- Hallucinated tables: `dg_inmates`, `inmates`, `rooms`, `facilities`, `dg_users`
-- Hallucinated columns: `created_at`, `inmate_name`, `cell_id`, `red_marked`
-- Gemini 2.5 Flash is a thinking model — 1K-4K internal reasoning tokens per query
+# Document QA pipeline
+openai>=1.0.0
+pypdf>=4.0.0
+python-docx>=1.0.0
+rank-bm25>=0.2.2
+```
 
-**Recommendation:** GPT-4o-mini at $0.15/1M input + $0.60/1M output tokens.
+---
 
-### GPT-4o-mini Pipeline Breakdown (warm query)
+## Documentation
 
-| Stage | Time | % of Total |
-|-------|------|-----------|
+| Document | Description |
+|----------|-------------|
+| [USAGE_GUIDE.md](docs/USAGE_GUIDE.md) | Complete guide to using the application |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture diagrams |
+| [SYSTEM_FLOWS.md](docs/SYSTEM_FLOWS.md) | Detailed request/response flows |
+| [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | V2 migration phases |
+| [V1_V2_SCOPE.md](docs/V1_V2_SCOPE.md) | V1 vs V2 comparison |
+| [INFRASTRUCTURE_ANALYSIS.md](docs/INFRASTRUCTURE_ANALYSIS.md) | AWS cost analysis |
+
+---
+
+## Performance
+
+### LLM Provider (GPT-4o-mini)
+
+| Metric | Value |
+|--------|-------|
+| Success rate | 100% (35/35 queries) |
+| Avg response time | 2.3s |
+| Cost | $0.15/1M input + $0.60/1M output tokens |
+
+### Pipeline Breakdown (warm query)
+
+| Stage | Time | % |
+|-------|------|---|
 | Guardrails | ~0.1 ms | <1% |
-| ChromaDB memory search | ~215 ms | 9% |
-| LLM SQL generation | ~1,800 ms | 78% |
-| SQL validation + filter injection | ~0.3 ms | <1% |
-| Aurora MySQL execution | ~150 ms | 7% |
-| **Total warm pipeline** | **~2,300 ms** | 100% |
+| ChromaDB search | ~215 ms | 9% |
+| LLM generation | ~1,800 ms | 78% |
+| SQL validation | ~0.3 ms | <1% |
+| DB execution | ~150 ms | 7% |
+| **Total** | **~2,300 ms** | 100% |
+
+### Document QA Pipeline
+
+| Stage | Time |
+|-------|------|
+| Query embedding | ~200 ms |
+| Semantic search | ~100 ms |
+| BM25 search | ~50 ms |
+| RRF fusion | ~5 ms |
+| LLM synthesis | ~2,000 ms |
+| **Total** | **~2,400 ms** |
 
 ---
 
-## Scaling Strategy
+## Deployment
 
-| Phase | Users | Deployment | Cost/mo |
-|-------|-------|-----------|---------|
-| 1 (now) | 5-10/day | Lambda + API Gateway | ~$35-45 |
-| 2 | 50-100/day | ECS Fargate | ~$120-175 |
-| 3 | 500 concurrent | Auto-scaling ECS | ~$450-750 |
+### Local Development
 
-The codebase is deployment-agnostic — same code runs on Lambda, ECS, or local.
+```bash
+python -m local.server
+```
+
+### AWS Lambda
+
+```bash
+sam build --template infra/template.yaml
+sam deploy \
+    --stack-name "InmateCopilot-V2-dev" \
+    --capabilities CAPABILITY_IAM \
+    --parameter-overrides "Environment=dev DeploymentId=a1b2c3d4e5"
+```
+
+### ECS Fargate
+
+Deploy using the same Docker image with `uvicorn` as the entrypoint.
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| **2.0** | 2026-03 | Guided multi-capability agent, Document QA pipeline, Orchestrator layer, Scope isolation |
+| **1.0** | 2026-01 | Initial release, SQL-only chatbot with Vanna AI |
+
+---
+
+## License
+
+Proprietary — Internal use only.

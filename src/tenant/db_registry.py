@@ -86,7 +86,7 @@ def execute_query(tenant: TenantContext, sql: str, limit: int | None = None) -> 
 
     try:
         with conn.cursor() as cursor:
-            logger.info("Executing SQL for tenant=%s: %s", tenant.customer_key, sql[:300])
+            logger.info("Executing SQL for tenant=%s: %s", tenant.customer_key, sql)
             cursor.execute(sql)
             rows = cursor.fetchall()
             logger.info("Query returned %d rows for tenant=%s", len(rows), tenant.customer_key)

@@ -578,6 +578,84 @@ Each `customer_key` creates a separate ChromaDB collection. Documents indexed wi
 
 ---
 
+## Response Summarization (Inmate Data Pipeline)
+
+The Inmate Data pipeline uses **LLM-enhanced summarization** to generate natural language responses from SQL query results. This provides dense, officer-friendly summaries instead of raw data tables.
+
+### How It Works
+
+1. **Insight Extraction** (fast, deterministic): 
+   - `InsightExtractor` computes key statistics from query results
+   - Calculates totals, date ranges, top categories, red flags, etc.
+   - Pure Python — no external calls, ~5ms
+
+2. **LLM Polish** (~1s latency):
+   - `ResponseSummarizer` sends structured stats to LLM
+   - Generates 2-3 sentence natural language summary
+   - Includes follow-up question suggestions
+
+3. **Smart Routing**:
+   - Simple count queries (e.g., "how many?") skip LLM entirely
+   - Complex multi-row results use full summarization
+
+### Example Transformation
+
+**Query**: "show notes from last 30 days"
+
+**Raw Data**: 500 rows with notes_id, description, date, keyword, officer...
+
+**Old Response (Template)**:
+```
+Found **500 notes** from Mar 01 to Mar 15.
+Categories: Fire Watch (120), Rounds (98)...
+
+• Mar 15, 10:30 AM — Inmate completed fire drill...
+• Mar 15, 09:15 AM — Routine cell inspection...
++495 more entries
+```
+
+**New Response (LLM-Summarized)**:
+```
+500 notes recorded over the past 30 days. Fire Watch leads at 24%, 
+followed by Rounds (20%). Richard Bell is the most active officer 
+with 50 entries. 3 red-flagged items need attention, peaking on Mar 12.
+
+Want to see the red-flagged entries?
+```
+
+### Benefits
+
+| Aspect | Template (Old) | LLM-Summarized (New) |
+|--------|----------------|----------------------|
+| Information density | Low | High |
+| Natural language | Stilted | Conversational |
+| Follow-up suggestions | None | Included |
+| Red flag highlighting | Basic | Prominent |
+| Accuracy | 100% | 100% (numbers from code) |
+| Latency | ~0ms | ~1-1.5s |
+
+### Components
+
+| File | Purpose |
+|------|---------|
+| `insight_extractor.py` | Extracts structured stats from rows |
+| `response_summarizer.py` | Generates LLM summaries from stats |
+| `response_formatter.py` | Main entry point, integrates both |
+
+### Customizing the Summarizer
+
+The LLM prompt is in `response_summarizer.py`:
+
+```python
+SUMMARIZER_SYSTEM_PROMPT = """You are Sarah, a helpful assistant for correctional officers.
+Your job is to summarize database query results into clear, dense natural language.
+Officers are busy — they need quick, scannable answers.
+...
+"""
+```
+
+---
+
 ## Configuration
 
 ### Environment Variables Reference

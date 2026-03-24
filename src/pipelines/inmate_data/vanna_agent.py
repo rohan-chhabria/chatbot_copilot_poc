@@ -22,6 +22,7 @@ from src.pipelines.inmate_data.response_formatter import (
     format_data_response,
     format_empty_response,
     format_error_response,
+    format_response_with_insights,
 )
 from src.pipelines.inmate_data.guardrails.question_validator import validate_question
 from src.pipelines.inmate_data.guardrails.sql_validator import inject_filters, validate_and_fix_sql
@@ -356,7 +357,7 @@ class AgentPipeline:
                 session, question, f"Query execution failed: {str(e)}"
             )
 
-        response = self._build_response(rows, question, sql)
+        response = await self._build_response(rows, question, sql)
         response = enrich_data_response(response, question, session)
         self._save_turn(session, question, sql, response)
         return response
@@ -439,8 +440,8 @@ class AgentPipeline:
             yield {"event": "error", "data": f"Query failed: {str(e)}"}
             return
 
-        yield {"event": "status", "data": "Preparing response..."}
-        response = self._build_response(rows, question, sql)
+        yield {"event": "status", "data": "Summarizing results..."}
+        response = await self._build_response(rows, question, sql)
         response = enrich_data_response(response, question, session)
         self._save_turn(session, question, sql, response)
         yield {"event": "result", "data": response}
@@ -511,18 +512,19 @@ class AgentPipeline:
             rows = execute_query(tenant, retry_sql, limit=MAX_QUERY_RESULTS)
         except Exception:
             return None
-        response = self._build_response(rows, question, retry_sql)
+        response = await self._build_response(rows, question, retry_sql)
         self._save_turn(session, question, retry_sql, response)
         return response
 
-    def _build_response(
+    async def _build_response(
         self, rows: list[dict], question: str, sql: str,
     ) -> dict[str, Any]:
+        """Build response using LLM-enhanced insight summarization."""
         if not rows:
             return format_empty_response(question, sql)
-        if _is_analytics_query(rows):
-            return format_analytics_response(rows, question, sql)
-        return format_data_response(rows, question, sql)
+        
+        # Use insight-based summarization for better UX
+        return await format_response_with_insights(rows, question, sql)
 
     def _save_turn(
         self, session: Session, question: str, sql: str, response: dict[str, Any],

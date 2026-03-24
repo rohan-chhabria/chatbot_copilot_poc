@@ -171,7 +171,9 @@ chatbot_copilot_poc/
 │   │   │   ├── vanna_agent.py           # Vanna AI 2.0 integration
 │   │   │   ├── intent_engine.py         # Intent detection
 │   │   │   ├── prompt_builder.py        # Context-aware prompts
-│   │   │   ├── response_formatter.py    # Officer-friendly formatting
+│   │   │   ├── response_formatter.py    # Response formatting (sync + async)
+│   │   │   ├── insight_extractor.py     # NEW: Stats extraction from rows
+│   │   │   ├── response_summarizer.py   # NEW: LLM summary generation
 │   │   │   ├── sarah_brain.py           # Personality/greeting logic
 │   │   │   ├── guardrails/
 │   │   │   │   ├── question_validator.py # Input validation

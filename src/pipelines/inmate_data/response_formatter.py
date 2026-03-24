@@ -1,8 +1,18 @@
 """
 Response Formatter — Converts raw query results into natural, officer-friendly responses.
 
-Each formatter produces a conversational intro sentence followed by structured details.
-No LLM needed — template-based formatting is faster and more reliable.
+This module provides two approaches:
+1. Template-based formatting (sync, fast, for simple queries)
+2. LLM-summarized formatting (async, for complex multi-row results)
+
+The LLM approach uses InsightExtractor to compute stats from rows, then
+ResponseSummarizer to polish them into natural language. This gives accurate
+numbers (from code) with engaging summaries (from LLM).
+
+Design:
+  - Template functions remain for backward compatibility and simple cases
+  - Async functions provide LLM-enhanced summaries for better UX
+  - InsightExtractor ensures numbers are never hallucinated
 """
 
 from __future__ import annotations
@@ -11,7 +21,7 @@ import json
 import re
 from collections import Counter
 from datetime import date, datetime
-from typing import Any
+from typing import Any, AsyncGenerator
 
 from src.shared.constants import HIGHLIGHTER_MAP, INTERNAL_COLUMNS, SENSITIVE_COLUMNS
 from src.shared.logger import get_logger
@@ -19,9 +29,119 @@ from src.shared.logger import get_logger
 logger = get_logger(__name__)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ASYNC LLM-ENHANCED FORMATTERS (Option 3: Pre-computed Insights + LLM Polish)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+async def format_response_with_insights(
+    rows: list[dict[str, Any]],
+    question: str,
+    sql: str,
+) -> dict[str, Any]:
+    """
+    Format response using insight extraction + LLM summarization.
+    
+    This is the primary formatter for complex queries. It:
+    1. Extracts structured insights from rows (fast, deterministic)
+    2. Sends insights to LLM for natural language summary (~1s)
+    3. Returns a dense, officer-friendly summary
+    
+    For simple count queries, skips LLM entirely for speed.
+    """
+    from src.pipelines.inmate_data.insight_extractor import InsightExtractor
+    from src.pipelines.inmate_data.response_summarizer import ResponseSummarizer
+    
+    # Filter sensitive columns first
+    filtered = _filter_columns(rows)
+    
+    # Extract insights
+    extractor = InsightExtractor()
+    insights = extractor.extract(filtered, question)
+    
+    logger.debug(
+        "Insights extracted: type=%s, count=%d, categories=%d",
+        insights.query_type,
+        insights.total_count,
+        len(insights.top_categories),
+    )
+    
+    # Generate summary
+    summarizer = ResponseSummarizer()
+    summary = await summarizer.summarize(insights, question)
+    
+    return {
+        "summary": summary,
+        "row_count": len(rows),
+        "truncated": len(rows) > 100,
+        "insights": {
+            "type": insights.query_type,
+            "red_flags": insights.red_flag_count,
+        },
+    }
+
+
+async def format_response_stream(
+    rows: list[dict[str, Any]],
+    question: str,
+    sql: str,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """
+    Stream response generation for SSE.
+    
+    Yields status events during insight extraction, then streams
+    the LLM-generated summary token by token.
+    """
+    from src.pipelines.inmate_data.insight_extractor import InsightExtractor
+    from src.pipelines.inmate_data.response_summarizer import ResponseSummarizer
+    
+    yield {"event": "status", "data": "Analyzing results..."}
+    
+    # Filter and extract insights
+    filtered = _filter_columns(rows)
+    extractor = InsightExtractor()
+    insights = extractor.extract(filtered, question)
+    
+    logger.debug(
+        "Streaming insights: type=%s, count=%d",
+        insights.query_type,
+        insights.total_count,
+    )
+    
+    yield {"event": "status", "data": "Generating summary..."}
+    
+    # Stream the summary
+    summarizer = ResponseSummarizer()
+    full_summary = ""
+    
+    async for token in summarizer.summarize_stream(insights, question):
+        full_summary += token
+        yield {"event": "token", "data": token}
+    
+    # Final result
+    yield {
+        "event": "result",
+        "data": {
+            "summary": full_summary,
+            "row_count": len(rows),
+            "truncated": len(rows) > 100,
+            "insights": {
+                "type": insights.query_type,
+                "red_flags": insights.red_flag_count,
+            },
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SYNC TEMPLATE-BASED FORMATTERS (Legacy, fast fallback)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
 def format_data_response(
     rows: list[dict[str, Any]], question: str, sql: str,
 ) -> dict[str, Any]:
+    """Legacy sync formatter using templates. Use format_response_with_insights for better UX."""
     filtered = _filter_columns(rows)
     summary = _smart_summary(filtered, question)
     return {
@@ -34,6 +154,7 @@ def format_data_response(
 def format_analytics_response(
     rows: list[dict[str, Any]], question: str, sql: str,
 ) -> dict[str, Any]:
+    """Legacy sync formatter for analytics queries."""
     summary = _smart_summary(rows, question)
     return {
         "summary": summary,

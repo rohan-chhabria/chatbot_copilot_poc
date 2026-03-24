@@ -127,7 +127,7 @@ async def init_session(request: SessionInitRequest):
         )
     else:
         greeting = (
-            f"Hello {role.title()} {display_name}, I'm {BOT_NAME} — your Inmate Intelligence assistant. "
+            f"Hello {role.title()} {display_name}, I'm Smart Access to Records, Analysis, and Help - {BOT_NAME} — your Inmate Intelligence assistant. "
             f"I can help you search notes, track inmates, check compliance, and more. "
             f"What can I help you with?"
         )
@@ -137,7 +137,7 @@ async def init_session(request: SessionInitRequest):
     return SessionInitResponse(
         session_id=session.session_id,
         bot_name=BOT_NAME,
-        greeting=greeting,
+        greeting=BOT_GREETING if BOT_GREETING else greeting,
         user={
             "user_id": user_cfg["user_id"],
             "display_name": display_name,

@@ -117,10 +117,10 @@ MAX_QUESTION_LENGTH: int = int(os.environ.get("MAX_QUESTION_LENGTH", "1000"))
 # ║  BOT / UI CONFIGURATION                                                ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
 
-BOT_NAME: str = os.environ.get("BOT_NAME", "Sarah")
+BOT_NAME: str = os.environ.get("BOT_NAME", "SARAH")
 BOT_GREETING: str = os.environ.get(
     "BOT_GREETING",
-    "Hi, I'm {bot_name} — your Inmate Intelligence assistant. "
+    f"Hi, I'm {BOT_NAME} (Smart Access to Records, Analysis, and Help) — your Inmate Intelligence assistant. "
     "Ask me anything about notes, inmates, officers, facilities, or keywords. "
     "How can I help you today?",
 )

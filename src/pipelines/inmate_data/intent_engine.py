@@ -90,7 +90,11 @@ _FOLLOW_UP_PATTERNS = re.compile(
     r"|\bthis\s+inmate\b|\bthat\s+inmate\b|\bfor\s+(?:him|her|them)\b"
     r"|\bthe\s+same\s+inmate\b|\btheir\s+\w+\b"
     r"|\blist\s+out\s+names?\b|\bshow\s+names?\b"
-    r"|\bfor\s+(?:this|that|these|those)\b)",
+    r"|\bfor\s+(?:this|that|these|those)\b"
+    # Possessive pronouns followed by any word (catches "his status", "her notes", etc.)
+    r"|\b(?:his|her)\s+\w+"
+    # Common follow-up starters with pronouns
+    r"|(?:list|show|get|what\s+(?:is|are))\s+(?:his|her)\b)",
     re.IGNORECASE,
 )
 
@@ -120,7 +124,9 @@ _PRONOUN_REF_PATTERNS = re.compile(
     r"\b(this|that|the)\s+(inmate|officer|person|prisoner|user|facility)\b"
     r"|\b(for\s+(?:him|her|them))\b"
     r"|\b(the\s+same\s+(?:inmate|officer|person))\b"
-    r"|\b(their\s+(?:movement|status|notes?|entries|history|location))\b",
+    r"|\b(their\s+(?:movement|status|notes?|entries|history|location|last|cell|room|bed))\b"
+    # Possessive pronouns: "his status", "her movements", "his last 5 notes"
+    r"|\b(his|her)\s+(?:movement|status|notes?|entries|history|location|last|cell|room|bed|record)\b",
     re.IGNORECASE,
 )
 

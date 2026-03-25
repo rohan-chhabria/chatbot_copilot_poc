@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     question: str = Field(
-        ..., min_length=3, max_length=1000, description="Natural language question"
+        ..., min_length=1, max_length=1000, description="Natural language question"
     )
     session_id: str | None = Field(None, description="Resume existing session")
     customer_key: str = Field(..., description="Tenant identifier")

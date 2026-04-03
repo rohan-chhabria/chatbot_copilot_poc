@@ -20,6 +20,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from local.bootstrap import LocalStores, bootstrap_local, load_local_users, shutdown_local
+# Import daily_activity FIRST to ensure it appears first in scope menu
+import src.pipelines.daily_activity  # noqa: F401
 from src.pipelines.inmate_data.vanna_agent import AgentPipeline
 from src.api.middleware import CORSHeaders, RequestLoggingMiddleware
 from src.api.routes import router as production_router

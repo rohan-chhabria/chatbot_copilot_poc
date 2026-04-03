@@ -28,6 +28,9 @@ class Pipeline(ABC):
     scope_icon: str = ""  # "📊", "📄"
     scope_description: str = ""  # "Query notes, inmates..."
 
+    # If True, pipeline auto-executes on scope selection (with empty question)
+    supports_auto_execute: bool = False
+
     @abstractmethod
     async def process(
         self,

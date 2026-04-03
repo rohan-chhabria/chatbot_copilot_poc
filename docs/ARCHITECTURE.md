@@ -19,7 +19,7 @@
 
 ## Executive Summary
 
-InmateCopilot V2 transforms from a single-purpose SQL chatbot into a **guided multi-capability conversational agent**. Users explicitly select their intent (Inmate Data queries, Document search, future capabilities) and the system maintains strict scope isolation while preserving context.
+InmateCopilot V2 transforms from a single-purpose SQL chatbot into a **guided multi-capability conversational agent**. Users explicitly select their intent (Inmate Data queries, Document search, Daily Activity checks, and future capabilities) and the system maintains strict scope isolation while preserving context.
 
 ### Key Architectural Principles
 
@@ -42,10 +42,10 @@ InmateCopilot V2 transforms from a single-purpose SQL chatbot into a **guided mu
 │  │                         Chat Interface (UI)                               │   │
 │  │  ┌─────────────┐  ┌─────────────────────────────────────────────────┐   │   │
 │  │  │   Sarah     │  │              Chat Window                         │   │   │
-│  │  │   Avatar    │  │  ┌─────────────┐  ┌─────────────┐               │   │   │
-│  │  │  [Switch]   │  │  │📊 Inmate    │  │📄 Documents │  [+ Future]   │   │   │
-│  │  └─────────────┘  │  │   Data      │  │             │               │   │   │
-│  │                   │  └─────────────┘  └─────────────┘               │   │   │
+│  │  │   Avatar    │  │  ┌───────────┐ ┌───────────┐ ┌───────────────┐ │   │   │
+│  │  │  [Switch]   │  │  │📊 Inmate  │ │📄 Documents│ │📅 Daily       │ │   │   │
+│  │  └─────────────┘  │  │   Data    │ │           │ │   Activity    │ │   │   │
+│  │                   │  └───────────┘ └───────────┘ └───────────────┘ │   │   │
 │  │                   │                                                   │   │   │
 │  │                   │  [Conversation Thread with Scope Indicator]       │   │   │
 │  │                   └─────────────────────────────────────────────────┘   │   │
@@ -110,9 +110,24 @@ InmateCopilot V2 transforms from a single-purpose SQL chatbot into a **guided mu
 │  │  │  │  │ └────────────────┘ │        │ └────────────────┘ │           │ │ │ │
 │  │  │  │  └────────────────────┘        └────────────────────┘           │ │ │ │
 │  │  │  │                                                                  │ │ │ │
+│  │  │  │  ┌────────────────────┐                                         │ │ │ │
+│  │  │  │  │  DAILY ACTIVITY    │                                         │ │ │ │
+│  │  │  │  │  PIPELINE          │                                         │ │ │ │
+│  │  │  │  │  (Compliance)      │                                         │ │ │ │
+│  │  │  │  │                    │                                         │ │ │ │
+│  │  │  │  │ ┌────────────────┐ │                                         │ │ │ │
+│  │  │  │  │ │ Activity Check │ │                                         │ │ │ │
+│  │  │  │  │ │ Timetable Load │ │                                         │ │ │ │
+│  │  │  │  │ │ DB Adapter     │ │                                         │ │ │ │
+│  │  │  │  │ │ Response Fmt   │ │                                         │ │ │ │
+│  │  │  │  │ └────────────────┘ │                                         │ │ │ │
+│  │  │  │  │ Auto-execute on    │                                         │ │ │ │
+│  │  │  │  │ scope selection    │                                         │ │ │ │
+│  │  │  │  └────────────────────┘                                         │ │ │ │
+│  │  │  │                                                                  │ │ │ │
 │  │  │  │  ┌─────────────────────────────────────────────────────────────┐│ │ │ │
 │  │  │  │  │                    FUTURE PIPELINES                         ││ │ │ │
-│  │  │  │  │   [Compliance]  [Analytics]  [Shift Planning]  [...]        ││ │ │ │
+│  │  │  │  │   [Analytics]  [Shift Planning]  [Risk Assessment]  [...]   ││ │ │ │
 │  │  │  │  └─────────────────────────────────────────────────────────────┘│ │ │ │
 │  │  │  └─────────────────────────────────────────────────────────────────┘ │ │ │
 │  │  │                                                                       │ │ │
@@ -206,16 +221,25 @@ src/pipelines/
 │   │   ├── question_validator.py
 │   │   └── sql_validator.py
 │   └── tests/
-└── document_qa/        # RAG pipeline
-    ├── pipeline.py
-    ├── retriever.py
-    ├── synthesizer.py
-    ├── documents/
-    │   ├── store.py
-    │   ├── loader.py
-    │   └── chunker.py
-    ├── guardrails/
-    │   └── validator.py
+├── document_qa/        # RAG pipeline
+│   ├── pipeline.py
+│   ├── retriever.py
+│   ├── synthesizer.py
+│   ├── documents/
+│   │   ├── store.py
+│   │   ├── loader.py
+│   │   └── chunker.py
+│   ├── guardrails/
+│   │   └── validator.py
+│   └── tests/
+└── daily_activity/     # Daily Activity pipeline (Compliance)
+    ├── pipeline.py         # DailyActivityPipeline (auto-execute)
+    ├── activity_checker.py # Core activity comparison logic
+    ├── db_adapter.py       # DB access via db_registry
+    ├── timetable_loader.py # Timetable loading with fallback
+    ├── response_formatter.py # Template-based summaries
+    ├── process_timetable.py  # CSV to JSON utility
+    ├── data/timetables/    # Timetable JSON files
     └── tests/
 ```
 
@@ -223,10 +247,11 @@ src/pipelines/
 
 ```python
 class Pipeline(ABC):
-    scope_id: str           # "inmate_data", "document_qa"
-    scope_label: str        # "Inmate Data", "Documents"
-    scope_icon: str         # "📊", "📄"
+    scope_id: str           # "inmate_data", "document_qa", "daily_activity"
+    scope_label: str        # "Inmate Data", "Documents", "Daily Activity"
+    scope_icon: str         # "📊", "📄", "📅"
     scope_description: str  # "Query notes, inmates..."
+    supports_auto_execute: bool = False  # If True, auto-run on scope selection
 
     @abstractmethod
     async def process(self, question: str, session: Session, scope_context: ScopeContext) -> dict

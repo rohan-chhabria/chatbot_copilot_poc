@@ -8,6 +8,8 @@ dist/
 *.egg-info/
 *.egg
 
+daily-activity-summary/
+
 .env
 .env.*
 !.env.example

@@ -159,3 +159,9 @@ DOC_RERANKING_ENABLED: bool = os.environ.get("DOC_RERANKING_ENABLED", "false").l
 # Scope Configuration
 DEFAULT_SCOPE: str | None = os.environ.get("DEFAULT_SCOPE") or None  # None = show options
 SCOPE_SWITCH_COOLDOWN: int = int(os.environ.get("SCOPE_SWITCH_COOLDOWN", "0"))  # seconds
+
+# Daily Activity Pipeline
+DAILY_ACTIVITY_LOOKBACK_HOURS: float = float(os.environ.get("DAILY_ACTIVITY_LOOKBACK_HOURS", "8.0"))
+DAILY_ACTIVITY_LOOKAHEAD_HOURS: float = float(os.environ.get("DAILY_ACTIVITY_LOOKAHEAD_HOURS", "4.0"))
+DAILY_ACTIVITY_TOLERANCE_MINUTES: int = int(os.environ.get("DAILY_ACTIVITY_TOLERANCE_MINUTES", "0"))
+DAILY_ACTIVITY_TIMETABLE_DIR: str = os.environ.get("DAILY_ACTIVITY_TIMETABLE_DIR", "src/pipelines/daily_activity/data/timetables",)

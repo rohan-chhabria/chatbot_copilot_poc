@@ -8,7 +8,7 @@ A multi-tenant, conversational AI system for correctional facility officers that
 
 ## What This System Does
 
-InmateCopilot V2 provides two distinct capabilities through a guided UI:
+InmateCopilot V2 provides three distinct capabilities through a guided UI:
 
 ### 📊 Inmate Data Pipeline (SQL)
 Officers query operational data using natural language:
@@ -29,6 +29,15 @@ Officers ask questions about policies, procedures, and documentation:
 | "How do I document a fire drill?" | BM25 + semantic search → RRF fusion → LLM synthesis |
 | "Explain the restraint removal process" | Retrieves from indexed PDFs/DOCXs → formatted response with sources |
 
+### 📅 Daily Activity Pipeline (Compliance)
+Officers check missed and upcoming scheduled activities:
+
+| Action | What Happens |
+|--------|-------------|
+| Select "Daily Activity" scope | Auto-executes activity check → shows missed + upcoming activities |
+| Type "refresh" | Re-runs activity check → displays updated status |
+| Activity comparison | Compares timetable schedule against database records |
+
 The system maintains **multi-turn conversations** (up to 15 turns per session) with **scope isolation** — switching between pipelines preserves context for when you return.
 
 ---
@@ -41,7 +50,7 @@ The system maintains **multi-turn conversations** (up to 15 turns per session) w
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                 CLIENT LAYER                                     │
 │    ┌─────────────┐  ┌─────────────────────────────────────────────────────┐    │
-│    │   Sarah     │  │  [📊 Inmate Data]  [📄 Documents]  ← Scope Selector │    │
+│    │   Sarah     │  │  [📊 Inmate Data]  [📄 Documents]  [📅 Daily Activity]│    │
 │    │   Avatar    │  │                                                      │    │
 │    └─────────────┘  │  Conversation Thread (scope-aware)                   │    │
 │                     └─────────────────────────────────────────────────────┘    │
@@ -180,19 +189,29 @@ chatbot_copilot_poc/
 │   │   │   │   └── sql_validator.py      # SQL security checks
 │   │   │   └── tests/                   # Pipeline-specific tests
 │   │   │
-│   │   └── document_qa/                 # NEW: RAG Pipeline
-│   │       ├── pipeline.py              # DocumentQAPipeline
-│   │       ├── retriever.py             # Hybrid search (semantic + BM25)
-│   │       ├── synthesizer.py           # LLM response synthesis
-│   │       ├── indexer.py               # Document indexing utilities
-│   │       ├── documents/
-│   │       │   ├── loader.py            # PDF/DOCX text extraction
-│   │       │   ├── chunker.py           # Recursive text chunking
-│   │       │   ├── store.py             # TenantDocumentStore (ChromaDB)
-│   │       │   └── models.py            # Document/Chunk data classes
-│   │       ├── guardrails/
-│   │       │   └── validator.py         # Document question validation
-│   │       └── tests/                   # Document pipeline tests
+│   │   ├── document_qa/                 # RAG Pipeline
+│   │   │   ├── pipeline.py              # DocumentQAPipeline
+│   │   │   ├── retriever.py             # Hybrid search (semantic + BM25)
+│   │   │   ├── synthesizer.py           # LLM response synthesis
+│   │   │   ├── indexer.py               # Document indexing utilities
+│   │   │   ├── documents/
+│   │   │   │   ├── loader.py            # PDF/DOCX text extraction
+│   │   │   │   ├── chunker.py           # Recursive text chunking
+│   │   │   │   ├── store.py             # TenantDocumentStore (ChromaDB)
+│   │   │   │   └── models.py            # Document/Chunk data classes
+│   │   │   ├── guardrails/
+│   │   │   │   └── validator.py         # Document question validation
+│   │   │   └── tests/                   # Document pipeline tests
+│   │   │
+│   │   └── daily_activity/              # Daily Activity Pipeline
+│   │       ├── pipeline.py              # DailyActivityPipeline
+│   │       ├── activity_checker.py      # Core activity comparison logic
+│   │       ├── db_adapter.py            # DB access via db_registry
+│   │       ├── timetable_loader.py      # Timetable loading with fallback
+│   │       ├── response_formatter.py    # Template-based summaries
+│   │       ├── process_timetable.py     # CSV to JSON conversion utility
+│   │       ├── data/timetables/         # Timetable JSON files
+│   │       └── tests/                   # Daily activity pipeline tests
 │   │
 │   ├── session/
 │   │   ├── models.py                    # Session model with scope context
@@ -311,9 +330,10 @@ PYTHONPATH=. uvicorn src.api.handler:app --reload --host 0.0.0.0 --port 8000
 PYTHONPATH=. pytest tests/ -v
 
 # Specific test suites
-PYTHONPATH=. pytest src/orchestrator/tests/ -v      # Orchestrator tests
-PYTHONPATH=. pytest src/pipelines/inmate_data/tests/ -v  # SQL pipeline tests
-PYTHONPATH=. pytest src/pipelines/document_qa/tests/ -v  # Document pipeline tests
+PYTHONPATH=. pytest src/orchestrator/tests/ -v          # Orchestrator tests
+PYTHONPATH=. pytest src/pipelines/inmate_data/tests/ -v # SQL pipeline tests
+PYTHONPATH=. pytest src/pipelines/document_qa/tests/ -v # Document pipeline tests
+PYTHONPATH=. pytest src/pipelines/daily_activity/tests/ -v  # Daily activity pipeline tests
 ```
 
 ---
@@ -481,6 +501,11 @@ Query: "attorney visit procedure"
 | `DOC_CHUNK_OVERLAP` | `50` | Chunk overlap (chars) |
 | `DOC_TOP_K` | `5` | Number of chunks to retrieve |
 | `DOC_PIPELINE_TIMEOUT` | `30` | Pipeline timeout (seconds) |
+| **Daily Activity** | | |
+| `DAILY_ACTIVITY_LOOKBACK_HOURS` | `8.0` | Hours to look back for missed activities |
+| `DAILY_ACTIVITY_LOOKAHEAD_HOURS` | `4.0` | Hours to look ahead for upcoming activities |
+| `DAILY_ACTIVITY_TOLERANCE_MINUTES` | `0` | Additional tolerance for task completion |
+| `DAILY_ACTIVITY_TIMETABLE_DIR` | `src/pipelines/daily_activity/data/timetables` | Timetable JSON directory |
 
 ### Multi-Tenant Configuration
 

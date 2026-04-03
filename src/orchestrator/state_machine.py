@@ -90,6 +90,8 @@ class ScopeStateMachine:
         User selected a scope (clicked option block).
 
         Returns welcome message for the scope.
+        For pipelines with supports_auto_execute=True, returns auto_execute flag
+        so the API layer can trigger the pipeline execution.
         """
         if not ScopeRegistry.is_valid_scope(scope_id):
             raise ScopeError(f"Invalid scope: {scope_id}")
@@ -104,8 +106,8 @@ class ScopeStateMachine:
         pipeline = ScopeRegistry.get(scope_id)
         welcome = pipeline.get_welcome_message(is_returning)
 
-        # If returning, add context reminder
-        if is_returning and scope_context.recent_queries:
+        # If returning, add context reminder (for non-auto-execute pipelines)
+        if is_returning and scope_context.recent_queries and not pipeline.supports_auto_execute:
             last_query = scope_context.recent_queries[-1]
             truncated = last_query[:50] + "..." if len(last_query) > 50 else last_query
             welcome = (
@@ -115,10 +117,11 @@ class ScopeStateMachine:
             )
 
         logger.info(
-            "Scope selected: %s (previous: %s, returning: %s)",
+            "Scope selected: %s (previous: %s, returning: %s, auto_execute: %s)",
             scope_id,
             previous_scope,
             is_returning,
+            pipeline.supports_auto_execute,
         )
 
         return {
@@ -127,6 +130,7 @@ class ScopeStateMachine:
             "previous_scope": previous_scope,
             "is_scope_change": True,
             "row_count": 0,
+            "auto_execute": pipeline.supports_auto_execute,
         }
 
     def get_scope_options(self, session: Session) -> dict[str, Any]:

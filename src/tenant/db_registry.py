@@ -96,6 +96,53 @@ def execute_query(tenant: TenantContext, sql: str, limit: int | None = None) -> 
         raise
 
 
+def execute_procedure(
+    tenant: TenantContext,
+    procedure_name: str,
+    params: list[Any],
+) -> list[dict[str, Any]]:
+    """
+    Execute a stored procedure and return results.
+
+    Args:
+        tenant: Tenant context with DB connection info
+        procedure_name: Name of stored procedure (e.g., 'p_ai_status_activenote_data')
+        params: List of parameter values in order
+
+    Returns:
+        List of result rows as dicts
+    """
+    conn = get_connection(tenant)
+
+    try:
+        with conn.cursor() as cursor:
+            placeholders = ", ".join(["%s"] * len(params))
+            sql = f"CALL {procedure_name}({placeholders})"
+            logger.info(
+                "Executing SP for tenant=%s: %s with %d params",
+                tenant.customer_key,
+                procedure_name,
+                len(params),
+            )
+            cursor.execute(sql, params)
+            rows = cursor.fetchall()
+            logger.info(
+                "SP %s returned %d rows for tenant=%s",
+                procedure_name,
+                len(rows),
+                tenant.customer_key,
+            )
+            return rows
+    except pymysql.Error as e:
+        logger.error(
+            "SP execution failed for tenant=%s procedure=%s: %s",
+            tenant.customer_key,
+            procedure_name,
+            str(e),
+        )
+        raise
+
+
 def close_all() -> None:
     with _lock:
         for key, conn in _pools.items():

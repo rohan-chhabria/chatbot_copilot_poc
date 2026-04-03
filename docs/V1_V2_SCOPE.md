@@ -27,6 +27,7 @@
 | **Scope Switching** | Switch button, context preserved per scope | Included |
 | **Inmate Data Pipeline** | Existing Vanna/SQL migrated to new structure | Included |
 | **Document QA Pipeline** | RAG with hybrid search (semantic + BM25) | Included |
+| **Daily Activity Pipeline** | Check missed/upcoming scheduled activities | Included |
 | **Multi-turn Context** | Follow-ups work within each scope | Included |
 | **Scope Resume** | Return to previous scope with context | Included |
 | **Cross-scope Recall** | "What did I ask earlier?" works | Included |
@@ -36,9 +37,10 @@
 | Component | V1 Implementation |
 |-----------|-------------------|
 | **Orchestrator** | ScopeStateMachine, ScopeRegistry, CrossScopeHandler |
-| **Pipeline Interface** | Abstract Pipeline base class |
+| **Pipeline Interface** | Abstract Pipeline base class with supports_auto_execute |
 | **Session Models** | Enhanced with active_scope, scope_contexts |
 | **Hybrid Search** | Semantic + BM25 + RRF fusion |
+| **Activity Checker** | Timetable comparison with DB records |
 | **Chunking** | Recursive (paragraph → sentence) |
 | **Embedding Model** | text-embedding-3-small |
 | **LLM** | GPT-4o-mini |
@@ -130,7 +132,6 @@
 
 | Pipeline | Description | V2 Priority |
 |----------|-------------|-------------|
-| **Compliance Check** | Verify policy adherence | Medium |
 | **Analytics/Reports** | Generate summary reports | High |
 | **Shift Planning** | Staffing recommendations | Low |
 | **Inmate Risk Assessment** | Behavioral analysis | Low |

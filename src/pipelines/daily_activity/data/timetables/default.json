@@ -1,0 +1,1701 @@
+[
+  {
+    "day": "Monday",
+    "tasks": [
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "07:30:00",
+        "end_time": "09:30:00",
+        "task": "1st Block/Program"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "07:45:00",
+        "end_time": "11:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "task": "Split shift Kitchen detail Start"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "09:45:00",
+        "end_time": "11:45:00",
+        "task": "2nd Block/Program"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "13:30:00",
+        "end_time": "15:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "13:45:00",
+        "end_time": "15:45:00",
+        "task": "3rd Block/Program"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "20:45:00",
+        "end_time": "21:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "21:00:00",
+        "end_time": "22:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:15:00",
+        "end_time": "23:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:30:00",
+        "end_time": "00:30:00",
+        "task": "Count-Official"
+      }
+    ]
+  },
+  {
+    "day": "Tuesday",
+    "tasks": [
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "07:30:00",
+        "end_time": "09:30:00",
+        "task": "1st Block/Program"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "07:45:00",
+        "end_time": "11:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "task": "Split shift Kitchen detail Start"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "09:45:00",
+        "end_time": "11:45:00",
+        "task": "2nd Block/Program"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "13:30:00",
+        "end_time": "15:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "13:45:00",
+        "end_time": "15:45:00",
+        "task": "3rd Block/Program"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "20:45:00",
+        "end_time": "21:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "21:00:00",
+        "end_time": "22:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:15:00",
+        "end_time": "23:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:30:00",
+        "end_time": "00:30:00",
+        "task": "Count-Official"
+      }
+    ]
+  },
+  {
+    "day": "Wednesday",
+    "tasks": [
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "07:30:00",
+        "end_time": "09:30:00",
+        "task": "1st Block/Program"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "07:45:00",
+        "end_time": "11:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "task": "Split shift Kitchen detail Start"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "09:00:00",
+        "end_time": "11:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "09:45:00",
+        "end_time": "11:45:00",
+        "task": "2nd Block/Program"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "13:30:00",
+        "end_time": "15:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "13:45:00",
+        "end_time": "15:45:00",
+        "task": "3rd Block/Program"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "20:45:00",
+        "end_time": "21:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "21:00:00",
+        "end_time": "22:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:15:00",
+        "end_time": "23:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:30:00",
+        "end_time": "00:30:00",
+        "task": "Count-Official"
+      }
+    ]
+  },
+  {
+    "day": "Thursday",
+    "tasks": [
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail report out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "07:30:00",
+        "end_time": "09:30:00",
+        "task": "1st Block/Program"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "07:45:00",
+        "end_time": "11:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "task": "Split shift Kitchen detail Start"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "09:45:00",
+        "end_time": "11:45:00",
+        "task": "2nd Block/Program"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "13:30:00",
+        "end_time": "15:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "13:45:00",
+        "end_time": "15:45:00",
+        "task": "3rd Block/Program"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "20:45:00",
+        "end_time": "21:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "21:00:00",
+        "end_time": "22:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:15:00",
+        "end_time": "23:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:30:00",
+        "end_time": "00:30:00",
+        "task": "Count-Official"
+      }
+    ]
+  },
+  {
+    "day": "Friday",
+    "tasks": [
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "00:45:00",
+        "end_time": "01:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "01:00:00",
+        "end_time": "02:00:00",
+        "task": "Count-Offical"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "07:30:00",
+        "end_time": "09:30:00",
+        "task": "1st Block/Program"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "07:45:00",
+        "end_time": "11:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "08:00:00",
+        "end_time": "17:00:00",
+        "task": "Split shift Kitchen detail Start"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "09:00:00",
+        "end_time": "11:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "09:45:00",
+        "end_time": "11:45:00",
+        "task": "2nd Block/Program"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Recreation |",
+        "statuses": {
+          "Recreation": [],
+          "Yard Call": []
+        },
+        "start_time": "13:30:00",
+        "end_time": "15:45:00",
+        "task": "Gym/Yard Call"
+      },
+      {
+        "keywords": "Program |",
+        "statuses": {
+          "Programming": []
+        },
+        "start_time": "13:45:00",
+        "end_time": "15:45:00",
+        "task": "3rd Block/Program"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      }
+    ]
+  },
+  {
+    "day": "Saturday",
+    "tasks": [
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "00:45:00",
+        "end_time": "01:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "01:00:00",
+        "end_time": "02:00:00",
+        "task": "Count-Offical"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "09:00:00",
+        "end_time": "11:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "13:00:00",
+        "end_time": "15:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      }
+    ]
+  },
+  {
+    "day": "Sunday",
+    "tasks": [
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "02:30:00",
+        "end_time": "03:00:00",
+        "task": "1st Shift Kitchen Detail Report Out"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "02:45:00",
+        "end_time": "03:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "04:45:00",
+        "end_time": "05:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "06:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "05:00:00",
+        "end_time": "07:00:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |",
+        "statuses": {
+          "Sanitation": [],
+          "Laundry": []
+        },
+        "start_time": "05:45:00",
+        "end_time": "06:00:00",
+        "task": "Sanitation/Laundry Orderly report out"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:15:00",
+        "end_time": "08:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "08:30:00",
+        "end_time": "09:30:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "09:00:00",
+        "end_time": "11:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Visitation |",
+        "statuses": {
+          "Visitation": []
+        },
+        "start_time": "13:00:00",
+        "end_time": "15:00:00",
+        "task": "Visitation"
+      },
+      {
+        "keywords": "Work Detail |",
+        "statuses": {
+          "Work Detail": []
+        },
+        "start_time": "11:00:00",
+        "end_time": "18:00:00",
+        "task": "2nd Shift Kitchen Detail"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "10:30:00",
+        "end_time": "11:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "11:00:00",
+        "end_time": "13:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:15:00",
+        "end_time": "12:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "12:30:00",
+        "end_time": "13:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Chow Call |",
+        "statuses": {},
+        "start_time": "15:00:00",
+        "end_time": "17:30:00",
+        "task": "Chow Call"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:15:00",
+        "end_time": "16:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "16:30:00",
+        "end_time": "17:30:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Medical |",
+        "statuses": {
+          "Medical": [
+            "Pill Call PM"
+          ]
+        },
+        "start_time": "16:45:00",
+        "end_time": "17:30:00",
+        "task": "Pill Call and Insulin"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "18:45:00",
+        "end_time": "19:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Census Count |",
+        "statuses": {},
+        "start_time": "19:00:00",
+        "end_time": "20:00:00",
+        "task": "Count-Census"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "20:45:00",
+        "end_time": "21:00:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "21:00:00",
+        "end_time": "22:00:00",
+        "task": "Count-Official"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:15:00",
+        "end_time": "23:30:00",
+        "task": "Prepare for Count"
+      },
+      {
+        "keywords": "Official Count |",
+        "statuses": {},
+        "start_time": "23:30:00",
+        "end_time": "00:30:00",
+        "task": "Count-Official"
+      }
+    ]
+  }
+]

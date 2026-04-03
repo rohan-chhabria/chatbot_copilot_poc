@@ -109,10 +109,11 @@ Open `http://localhost:8000` and select a user profile from the login screen:
 After login, you'll be greeted with scope options:
 
 
-| Scope           | Icon | Description                                        |
-| --------------- | ---- | -------------------------------------------------- |
-| **Inmate Data** | 📊   | Query notes, inmates, officers, facilities via SQL |
-| **Documents**   | 📄   | Search manuals, policies, SOPs via RAG             |
+| Scope              | Icon | Description                                        |
+| ------------------ | ---- | -------------------------------------------------- |
+| **Inmate Data**    | 📊   | Query notes, inmates, officers, facilities via SQL |
+| **Documents**      | 📄   | Search manuals, policies, SOPs via RAG             |
+| **Daily Activity** | 📅   | Check missed and upcoming scheduled activities     |
 
 
 Click a scope block to enter that mode.
@@ -575,6 +576,126 @@ DOC_CHROMA_DIR=./chroma_docs
 ### Tenant Isolation
 
 Each `customer_key` creates a separate ChromaDB collection. Documents indexed with `customer_key="acme"` are completely isolated from `customer_key="demo"`. This ensures multi-tenant data separation.
+
+---
+
+## Daily Activity Pipeline (Compliance)
+
+The Daily Activity pipeline checks scheduled activities against database records to identify missed and upcoming tasks. It auto-executes on scope selection and supports the "refresh" keyword for updates.
+
+### How It Works
+
+1. **Auto-Execute on Scope Selection**: When you select the Daily Activity scope, the pipeline automatically runs an activity check.
+
+2. **Timetable Comparison**: The system compares scheduled activities from the timetable JSON against actual database records.
+
+3. **Multi-Facility Support**: Results are aggregated across all facilities assigned to the user.
+
+4. **Refresh Keyword**: Type "refresh" to re-run the activity check and get updated results.
+
+### Response Format
+
+The pipeline generates template-based summaries (no LLM calls) with:
+
+- **Missed activities**: Tasks scheduled but not recorded in the lookback window
+- **Upcoming activities**: Tasks scheduled in the lookahead window
+- Full duration format: `(HH:MM-HH:MM)`
+- Per-facility breakdown for multi-facility users
+
+### Example Response (Single Facility)
+
+```
+You have **3 missed** and **5 upcoming** activities for Main Block.
+
+⚠️ **Missed (last 8h):**
+- Count-Official (03:00-04:00)
+- Pill Call (04:45-05:30)
+- Chow Call (05:00-07:00)
+
+📌 **Upcoming (next 4h):**
+- Recreation (10:00-11:00)
+- Count-Official (11:00-12:00)
+- Chow Call (12:00-14:00)
+- Pill Call (13:00-13:30)
+- 1st Block/Program (09:30-11:30)
+
+💡 Type "refresh" to update.
+```
+
+### Example Response (Multi-Facility)
+
+```
+Across **2 facilities**, you have **5 missed** and **8 upcoming** activities.
+
+🏢 **Main Block** — 3 missed, 4 upcoming
+⚠️ Missed: Count-Official (03:00-04:00), Pill Call (04:45-05:30), Chow Call (05:00-07:00)
+📌 Upcoming: Recreation (10:00-11:00), Count-Official (11:00-12:00), Chow Call (12:00-14:00), Pill Call (13:00-13:30)
+
+🏢 **East Wing** — 2 missed, 4 upcoming
+⚠️ Missed: Count-Official (03:00-04:00), Sanitation Check (06:00-06:30)
+📌 Upcoming: Medical Rounds (09:45-10:15), Count-Official (11:00-12:00), Chow Call (12:00-14:00), Pill Call (13:00-13:30)
+
+💡 Type "refresh" to update.
+```
+
+### Timetable Management
+
+Timetables are JSON files that define scheduled activities per day. The system uses a fallback lookup order:
+
+1. `{TIMETABLE_DIR}/{customer_key}/{facility_id}.json` — per-facility
+2. `{TIMETABLE_DIR}/{customer_key}/default.json` — per-tenant default
+3. `{TIMETABLE_DIR}/default.json` — global default
+
+#### Timetable Format
+
+```json
+[
+  {
+    "day": "Monday",
+    "tasks": [
+      {
+        "task": "Count-Official",
+        "start_time": "03:00:00",
+        "end_time": "04:00:00",
+        "keywords": "Official Count |",
+        "statuses": {}
+      },
+      {
+        "task": "Pill Call",
+        "start_time": "04:45:00",
+        "end_time": "05:30:00",
+        "keywords": "Pill Call |, Medical |",
+        "statuses": {}
+      }
+    ]
+  }
+]
+```
+
+#### Converting CSV to JSON
+
+Use the included utility to convert CSV timetables to JSON format:
+
+```bash
+python -m src.pipelines.daily_activity.process_timetable input.csv output.json
+```
+
+**CSV Format:**
+
+```csv
+Time,Keywords,Statuses,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday
+0300-0400,Official Count |,,Count-Official,Count-Official,Count-Official,Count-Official,Count-Official,Count-Official,Count-Official
+0445-0530,Pill Call |,,Pill Call,Pill Call,Pill Call,Pill Call,Pill Call,Pill Call,Pill Call
+```
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DAILY_ACTIVITY_LOOKBACK_HOURS` | `8.0` | Hours to look back for missed activities |
+| `DAILY_ACTIVITY_LOOKAHEAD_HOURS` | `4.0` | Hours to look ahead for upcoming activities |
+| `DAILY_ACTIVITY_TOLERANCE_MINUTES` | `0` | Additional tolerance after task end time |
+| `DAILY_ACTIVITY_TIMETABLE_DIR` | `src/pipelines/daily_activity/data/timetables` | Timetable directory path |
 
 ---
 

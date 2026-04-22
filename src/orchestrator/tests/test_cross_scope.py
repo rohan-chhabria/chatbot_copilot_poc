@@ -69,6 +69,11 @@ class TestGreetings:
         result = handler.handle("hello", session)
         assert "Test" in result["summary"]
 
+    def test_greeting_with_embedded_query_not_intercepted(self, handler, session):
+        session.switch_scope("test_scope")
+        result = handler.handle("hello show fire watch notes today", session)
+        assert result is None
+
 
 class TestFarewells:
     def test_recognizes_bye(self, handler, session):
@@ -121,6 +126,13 @@ class TestRecall:
     def test_recall_empty_history(self, handler, session):
         result = handler.handle("what did I ask?", session)
         assert "No questions yet" in result["summary"]
+
+
+class TestSelfIdentity:
+    def test_recognizes_self_identity(self, handler, session):
+        result = handler.handle("who am i", session)
+        assert result is not None
+        assert result.get("is_self_identity") is True
 
 
 class TestNonCrossScopeMessages:

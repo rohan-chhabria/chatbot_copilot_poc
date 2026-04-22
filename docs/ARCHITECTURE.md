@@ -183,7 +183,7 @@ src/api/
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `POST /chat` | Unified chat | Routes to active pipeline |
-| `GET /chat/stream` | SSE streaming | Token-by-token responses |
+| `POST /chat/stream` | SSE streaming | Token-by-token responses |
 | `POST /scope/select` | Scope selection | User clicks option block |
 | `GET /scope/options` | Available scopes | Returns scope metadata |
 | `GET /health` | Health check | Pipeline status |
@@ -196,7 +196,8 @@ src/orchestrator/
 ├── __init__.py
 ├── state_machine.py    # ScopeStateMachine
 ├── scope_registry.py   # Pipeline registry
-└── cross_scope.py      # Greetings, recall, help
+├── cross_scope.py      # Cross-scope detection/dispatch
+└── persona.py          # Shared persona response builders
 ```
 
 **Responsibilities:**

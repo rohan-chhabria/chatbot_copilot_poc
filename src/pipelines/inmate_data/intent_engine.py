@@ -8,9 +8,6 @@ Two-layer classification:
 Intent types:
   DATA_QUERY      — Needs SQL generation + execution
   FOLLOW_UP       — Context-dependent data query (references prior turn)
-  GREETING        — "hi", "hello", "good morning"
-  FAREWELL        — "bye", "thanks", "goodbye"
-  CAPABILITY      — "what can you do?", "help", "how do you work"
   GENERAL_DOMAIN  — Domain question answerable without SQL
   CLARIFICATION   — Ambiguous input, ask user for details
   OUT_OF_SCOPE    — Not related to correctional operations
@@ -31,10 +28,6 @@ logger = get_logger(__name__)
 class Intent(str, Enum):
     DATA_QUERY = "data_query"
     FOLLOW_UP = "follow_up"
-    GREETING = "greeting"
-    FAREWELL = "farewell"
-    CAPABILITY = "capability"
-    SELF_IDENTITY = "self_identity"
     GENERAL_DOMAIN = "general_domain"
     CLARIFICATION = "clarification"
     OUT_OF_SCOPE = "out_of_scope"
@@ -50,34 +43,6 @@ class IntentResult:
 
 
 # ── Layer 1: Pattern-based fast classification ────────────────────────────
-
-_SELF_IDENTITY_PATTERNS = re.compile(
-    r"(what('?s|\s+is)\s+my\s+name|who\s+am\s+i|who\s+i\s+am|my\s+name|my\s+identity"
-    r"|what\s+do\s+you\s+know\s+about\s+me|do\s+you\s+know\s+(me|who\s+i\s+am)"
-    r"|tell\s+me\s+about\s+myself|my\s+profile|my\s+info"
-    r"|who\s+am\s+i\s+logged\s+in\s+as|who\s+i\s+am\s+logged)",
-    re.IGNORECASE,
-)
-
-_GREETING_PATTERNS = re.compile(
-    r"^(hi|hey|hello|good\s*(morning|afternoon|evening)|howdy|yo|sup)\b",
-    re.IGNORECASE,
-)
-
-_FAREWELL_PATTERNS = re.compile(
-    r"^(bye|goodbye|good\s*bye|see\s*you|take\s*care|thanks?(\s+you)?|thank\s*you"
-    r"|that('?s|\s+is)\s+(all|it)|done|exit|quit)\b",
-    re.IGNORECASE,
-)
-
-_CAPABILITY_PATTERNS = re.compile(
-    r"(what\s+(can|do)\s+you\s+do|help\s*me|how\s+do\s+you\s+work|what\s+are\s+you"
-    r"|who\s+are\s+you|what('?s|\s+is)\s+your\s+(name|purpose|role)"
-    r"|what\s+kind\s+of\s+questions?|can\s+you\s+help|how\s+can\s+you\s+help"
-    r"|show\s+me\s+what\s+you\s+can|capabilities|your\s+features"
-    r"|what\s+should\s+i\s+ask|give\s+me\s+examples?|what\s+data\b)",
-    re.IGNORECASE,
-)
 
 _FOLLOW_UP_PATTERNS = re.compile(
     r"(show\s+me\s+more|tell\s+me\s+more|more\s+details?|expand\s+on"
@@ -145,51 +110,6 @@ def classify_intent(
 ) -> IntentResult:
     """Classify user intent using fast pattern matching (Layer 1)."""
     q = question.strip()
-
-    if _GREETING_PATTERNS.search(q):
-        extra_content = q[_GREETING_PATTERNS.search(q).end():].strip()
-        if extra_content and _DATA_SIGNALS.search(extra_content):
-            return IntentResult(
-                intent=Intent.DATA_QUERY,
-                confidence=0.85,
-                entities={},
-                rewritten_question=extra_content,
-                reasoning="Greeting with embedded data question",
-            )
-        return IntentResult(
-            intent=Intent.GREETING,
-            confidence=0.95,
-            entities={},
-            rewritten_question=q,
-            reasoning="Matched greeting pattern",
-        )
-
-    if _SELF_IDENTITY_PATTERNS.search(q):
-        return IntentResult(
-            intent=Intent.SELF_IDENTITY,
-            confidence=0.95,
-            entities={},
-            rewritten_question=q,
-            reasoning="User asking about their own identity",
-        )
-
-    if _FAREWELL_PATTERNS.search(q):
-        return IntentResult(
-            intent=Intent.FAREWELL,
-            confidence=0.95,
-            entities={},
-            rewritten_question=q,
-            reasoning="Matched farewell pattern",
-        )
-
-    if _CAPABILITY_PATTERNS.search(q):
-        return IntentResult(
-            intent=Intent.CAPABILITY,
-            confidence=0.95,
-            entities={},
-            rewritten_question=q,
-            reasoning="Matched capability/help pattern",
-        )
 
     oos_match = _OUT_OF_SCOPE_PATTERNS.search(q)
     if oos_match:

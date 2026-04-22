@@ -61,7 +61,7 @@
 | Endpoint | V1 Status |
 |----------|-----------|
 | `POST /chat` | Modified (uses orchestrator) |
-| `GET /chat/stream` | Modified (scope-aware streaming) |
+| `POST /chat/stream` | Modified (scope-aware streaming) |
 | `POST /scope/select` | New |
 | `GET /scope/options` | New |
 | `GET /pipelines/health/{scope}` | New |

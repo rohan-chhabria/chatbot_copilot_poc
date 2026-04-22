@@ -42,3 +42,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+.copilot/
+
+graphify-out/
+.graphifyignore 
+
+.github/copilot-instructions.md

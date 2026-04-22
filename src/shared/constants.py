@@ -128,12 +128,6 @@ IRRELEVANT_PATTERNS: list[str] = [
     "translate", "calculate", "math", "homework",
 ]
 
-NON_SQL_PATTERNS: list[str] = [
-    "how are you", "hello", "hi ", "hey ", "thanks",
-    "thank you", "bye", "goodbye", "good morning",
-    "help me", "what can you do", "who are you",
-]
-
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  HIGHLIGHTER COLORS                                                    ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝

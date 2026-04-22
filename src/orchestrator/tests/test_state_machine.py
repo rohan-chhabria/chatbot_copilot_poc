@@ -171,3 +171,17 @@ class TestStreamDispatch:
         
         events = run_async(collect_events())
         assert len(events) > 0
+
+    def test_stream_greeting_handled_cross_scope(self, state_machine, session):
+        session.switch_scope("mock_scope")
+
+        async def collect_events():
+            events = []
+            async for event in state_machine.dispatch_stream("hello", session):
+                events.append(event)
+            return events
+
+        events = run_async(collect_events())
+        assert len(events) == 1
+        assert events[0]["event"] == "result"
+        assert events[0]["data"].get("is_greeting") is True

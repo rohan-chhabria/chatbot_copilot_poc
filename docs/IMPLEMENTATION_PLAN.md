@@ -57,7 +57,7 @@ src/
 │   ├── intent_engine.py
 │   ├── prompt_builder.py
 │   ├── response_formatter.py
-│   ├── sarah_brain.py
+│   ├── domain_responses.py
 │   └── vanna_agent.py      # AgentPipeline class
 ├── guardrails/
 │   ├── __init__.py
@@ -119,7 +119,7 @@ src/
 │   │   ├── prompt_builder.py        # MOVED from agent/
 │   │   ├── response_formatter.py    # MOVED from agent/
 │   │   ├── intent_engine.py         # MOVED from agent/
-│   │   ├── sarah_brain.py           # MOVED from agent/
+│   │   ├── domain_responses.py      # Inmate-domain conversational logic
 │   │   ├── guardrails/
 │   │   │   ├── __init__.py
 │   │   │   ├── question_validator.py  # MOVED from guardrails/
@@ -1173,7 +1173,7 @@ Move these files to `src/pipelines/inmate_data/`:
 | `src/agent/prompt_builder.py` | `src/pipelines/inmate_data/prompt_builder.py` |
 | `src/agent/response_formatter.py` | `src/pipelines/inmate_data/response_formatter.py` |
 | `src/agent/intent_engine.py` | `src/pipelines/inmate_data/intent_engine.py` |
-| `src/agent/sarah_brain.py` | `src/pipelines/inmate_data/sarah_brain.py` |
+| `src/agent/sarah_brain.py` | `src/pipelines/inmate_data/domain_responses.py` |
 | `src/guardrails/question_validator.py` | `src/pipelines/inmate_data/guardrails/question_validator.py` |
 | `src/guardrails/sql_validator.py` | `src/pipelines/inmate_data/guardrails/sql_validator.py` |
 
@@ -1212,7 +1212,7 @@ from src.pipelines.inmate_data.response_formatter import (
     format_empty_response,
     format_error_response,
 )
-from src.pipelines.inmate_data.sarah_brain import generate_response
+from src.pipelines.inmate_data.domain_responses import generate_response
 
 warnings.warn(
     "src.agent is deprecated. Use src.pipelines.inmate_data instead.",
@@ -1916,7 +1916,7 @@ tests/
 | `src/agent/intent_engine.py` | `src/pipelines/inmate_data/intent_engine.py` |
 | `src/agent/prompt_builder.py` | `src/pipelines/inmate_data/prompt_builder.py` |
 | `src/agent/response_formatter.py` | `src/pipelines/inmate_data/response_formatter.py` |
-| `src/agent/sarah_brain.py` | `src/pipelines/inmate_data/sarah_brain.py` |
+| `src/agent/sarah_brain.py` | `src/pipelines/inmate_data/domain_responses.py` |
 | `src/guardrails/*` | `src/pipelines/inmate_data/guardrails/*` |
 
 ---

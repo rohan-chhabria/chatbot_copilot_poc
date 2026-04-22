@@ -183,7 +183,7 @@ chatbot_copilot_poc/
 │   │   │   ├── response_formatter.py    # Response formatting (sync + async)
 │   │   │   ├── insight_extractor.py     # NEW: Stats extraction from rows
 │   │   │   ├── response_summarizer.py   # NEW: LLM summary generation
-│   │   │   ├── sarah_brain.py           # Personality/greeting logic
+│   │   │   ├── domain_responses.py      # Inmate-domain conversational responses
 │   │   │   ├── guardrails/
 │   │   │   │   ├── question_validator.py # Input validation
 │   │   │   │   └── sql_validator.py      # SQL security checks

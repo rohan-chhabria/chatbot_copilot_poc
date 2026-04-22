@@ -191,6 +191,20 @@ class ScopeStateMachine:
             message[:80],
         )
 
+        cross_scope_response = self._cross_scope.handle(message, session)
+        if cross_scope_response:
+            logger.debug(
+                "Cross-scope handled in stream path: type=%s",
+                "greeting" if cross_scope_response.get("is_greeting") else
+                "farewell" if cross_scope_response.get("is_farewell") else
+                "help" if cross_scope_response.get("is_help") else
+                "self_identity" if cross_scope_response.get("is_self_identity") else
+                "recall" if cross_scope_response.get("is_recall") else "unknown",
+            )
+            self._save_conversational_turn(session, message, cross_scope_response)
+            yield {"event": "result", "data": cross_scope_response}
+            return
+
         if session.active_scope is None:
             logger.debug("No scope selected, returning error")
             yield {"event": "error", "data": "Please select a scope first."}

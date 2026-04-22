@@ -768,7 +768,7 @@ Want to see the red-flagged entries?
 The LLM prompt is in `response_summarizer.py`:
 
 ```python
-SUMMARIZER_SYSTEM_PROMPT = """You are Sarah, a helpful assistant for correctional officers.
+SUMMARIZER_SYSTEM_PROMPT = """You are a helpful assistant for correctional officers.
 Your job is to summarize database query results into clear, dense natural language.
 Officers are busy — they need quick, scannable answers.
 ...
@@ -982,5 +982,4 @@ LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
 | Ingest docs  | `python ingest_documents.py /path/to/docs/` |
 | Run tests    | `python -m pytest tests/ -v`                |
 | Health check | `curl http://localhost:8000/health`         |
-
 

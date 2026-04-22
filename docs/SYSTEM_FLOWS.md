@@ -745,8 +745,7 @@ active_scope = None
 │ CrossScopeHandler.is_greeting() → True      │
 │                                             │
 │ Response:                                   │
-│ "Hi there! I'm Sarah, your assistant.      │
-│  Please select what you'd like help with:" │
+│ BOT_GREETING (from config) + scope options │
 │                                             │
 │  ┌───────────────┐  ┌───────────────┐      │
 │  │📊 Inmate Data │  │📄 Documents   │      │

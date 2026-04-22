@@ -269,7 +269,7 @@ class AgentPipeline:
 
     Flow:
       1. Classify intent (fast pattern match)
-      2. Non-data intents → Sarah's brain (no SQL)
+      2. Non-data intents → domain responses (no SQL)
       3. Data intents → SQL pipeline (generate → validate → execute → format)
     """
 
@@ -288,7 +288,10 @@ class AgentPipeline:
         tenant: TenantContext,
     ) -> dict[str, Any]:
         from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
-        from src.pipelines.inmate_data.sarah_brain import enrich_data_response, generate_response
+        from src.pipelines.inmate_data.domain_responses import (
+            enrich_data_response,
+            generate_response,
+        )
 
         has_history = len(session.turns) > 0
         last_content = session.turns[-1].content if session.turns else ""
@@ -370,7 +373,10 @@ class AgentPipeline:
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Yields incremental SSE events as the pipeline progresses."""
         from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
-        from src.pipelines.inmate_data.sarah_brain import enrich_data_response, generate_response
+        from src.pipelines.inmate_data.domain_responses import (
+            enrich_data_response,
+            generate_response,
+        )
 
         has_history = len(session.turns) > 0
         last_content = session.turns[-1].content if session.turns else ""

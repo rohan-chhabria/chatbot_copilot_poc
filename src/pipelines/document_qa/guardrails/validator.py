@@ -6,7 +6,6 @@ Ensures questions are appropriate for document search.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 
@@ -24,13 +23,6 @@ class DocumentQueryValidator:
 
     MIN_QUERY_LENGTH = 3
     MAX_QUERY_LENGTH = 500
-
-    # Patterns that indicate non-document queries
-    NON_DOCUMENT_PATTERNS = [
-        r"^(hi|hello|hey|good\s+(morning|afternoon|evening))(\s|$)",
-        r"^(bye|goodbye|thanks?|thank\s+you)(\s|$)",
-        r"(what\s+can\s+you\s+do|help|capabilities)",
-    ]
 
     def validate(self, query: str) -> ValidationResult:
         """Validate a document search query."""
@@ -52,14 +44,6 @@ class DocumentQueryValidator:
                 is_valid=False,
                 error=f"Query too long. Maximum {self.MAX_QUERY_LENGTH} characters.",
             )
-
-        # Check for non-document patterns
-        for pattern in self.NON_DOCUMENT_PATTERNS:
-            if re.search(pattern, cleaned.lower()):
-                return ValidationResult(
-                    is_valid=False,
-                    error="This looks like a greeting or general question, not a document search.",
-                )
 
         return ValidationResult(is_valid=True, cleaned_query=cleaned)
 

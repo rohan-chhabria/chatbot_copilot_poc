@@ -14,7 +14,6 @@ from src.shared.config import MAX_QUESTION_LENGTH, MIN_QUESTION_LENGTH
 from src.shared.constants import (
     DOMAIN_KEYWORDS,
     IRRELEVANT_PATTERNS,
-    NON_SQL_PATTERNS,
     QUERY_KEYWORDS,
     SCHEMA_PATTERNS,
     SQL_INJECTION_PATTERNS,
@@ -78,17 +77,6 @@ def _check_length(question: str) -> ValidationResult:
             is_valid=False,
             error=f"Question too long. Maximum {MAX_QUESTION_LENGTH} characters.",
         )
-    return ValidationResult(is_valid=True, cleaned_question=question)
-
-
-def _check_non_sql(question: str) -> ValidationResult:
-    lower = question.lower()
-    for pattern in NON_SQL_PATTERNS:
-        if lower.startswith(pattern) or lower == pattern.strip():
-            return ValidationResult(
-                is_valid=False,
-                error="Please ask a question about inmate or facility data.",
-            )
     return ValidationResult(is_valid=True, cleaned_question=question)
 
 

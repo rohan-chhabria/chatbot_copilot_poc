@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -141,3 +142,61 @@ class TestHistoryEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 2
+
+
+class TestChatStreamEndpoint:
+    @patch("src.api.routes._get_state_machine")
+    @patch("src.api.routes._get_session_store")
+    def test_chat_stream_greeting_active_scope_uses_cross_scope(
+        self,
+        mock_store_fn,
+        mock_sm_fn,
+        client,
+        session,
+    ):
+        session.active_scope = "inmate_data"
+
+        mock_store = MagicMock()
+        mock_store.get.return_value = session
+        mock_store_fn.return_value = mock_store
+
+        async def fake_dispatch_stream(*, message, session):
+            _ = message
+            _ = session
+            yield {
+                "event": "result",
+                "data": {
+                    "summary": "Hi there! I'm currently helping you with Inmate Data. What would you like to know?",
+                    "is_greeting": True,
+                    "scope": "inmate_data",
+                    "row_count": 0,
+                },
+            }
+
+        mock_sm = MagicMock()
+        mock_sm.dispatch_stream = fake_dispatch_stream
+        mock_sm_fn.return_value = mock_sm
+
+        response = client.post(
+            "/chat/stream",
+            json={
+                "question": "hello",
+                "customer_key": "demo",
+                "user_id": "Test.Officer",
+                "session_id": session.session_id,
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.text
+        assert "event: result" in body
+        payload_lines = [line for line in body.splitlines() if line.startswith("data: ")]
+        assert payload_lines
+        result_payload = None
+        for line in payload_lines:
+            payload = json.loads(line.replace("data: ", ""))
+            if isinstance(payload, dict) and payload.get("is_greeting"):
+                result_payload = payload
+                break
+        assert result_payload is not None
+        assert result_payload["is_greeting"] is True

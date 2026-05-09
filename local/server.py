@@ -1,7 +1,7 @@
 """
 Local Development Server — Entry point for local E2E testing.
 
-Boots moto DynamoDB + in-memory sessions, mounts the dashboard UI,
+Boots configured local backends (redis/sqlite by default), mounts the dashboard UI,
 adds local-only endpoints (/users, /session/init), and starts uvicorn.
 
 Usage:
@@ -22,7 +22,6 @@ from pydantic import BaseModel, Field
 from local.bootstrap import LocalStores, bootstrap_local, load_local_users, shutdown_local
 # Import daily_activity FIRST to ensure it appears first in scope menu
 import src.pipelines.daily_activity  # noqa: F401
-from src.pipelines.inmate_data.vanna_agent import AgentPipeline
 from src.api.middleware import CORSHeaders, RequestLoggingMiddleware
 from src.api.routes import router as production_router
 from src.session.session_manager import create_session
@@ -46,7 +45,7 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(
     title="InmateCopilot — Local Dev",
-    description="Local development server with moto DynamoDB + in-memory sessions",
+    description="Local development server with configured runtime stores",
     version="1.0.0-local",
     lifespan=lifespan,
 )
@@ -60,10 +59,6 @@ def _inject_stores_into_routes(stores: LocalStores) -> None:
     from src.api import routes
     routes._session_store = stores.session_store
     routes._conversation_store = stores.conversation_store
-    routes._pipeline = AgentPipeline(
-        session_store=stores.session_store,
-        conversation_store=stores.conversation_store,
-    )
 
 
 # ── Mount production routes ───────────────────────────────────────────────

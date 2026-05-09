@@ -29,10 +29,14 @@ pip install -r requirements.txt
 # 2. Set up environment
 cp .env.example .env  # Edit with your OpenAI key, DB credentials
 
-# 3. Run local development server
+# 3. Start Redis for local STM (required)
+redis-server
+# or: docker run --name copilot-redis -p 6379:6379 -d redis:7
+
+# 4. Run local development server
 python -m local.server
 
-# 4. Open browser
+# 5. Open browser
 # Dashboard: http://localhost:8000
 # API Docs:  http://localhost:8000/docs
 ```
@@ -43,9 +47,16 @@ python -m local.server
 
 ### Local Development Server
 
-The local server includes mock AWS services and in-memory sessions:
+The local server uses runtime local backends by default:
+
+- STM: Redis
+- LTM: SQLite file
 
 ```bash
+# Start Redis first (required for STM)
+redis-server
+# or: docker run --name copilot-redis -p 6379:6379 -d redis:7
+
 python -m local.server
 ```
 
@@ -164,6 +175,9 @@ What are the visitor check-in policies?
 
 Main chat endpoint (uses orchestrator).
 
+If `session_id` is provided but expired/invalid, the endpoint returns HTTP `200` with:
+`{"success": false, "error": "session_expired"}`.
+
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
@@ -190,6 +204,9 @@ curl -X POST http://localhost:8000/chat \
 #### POST /chat/stream
 
 SSE streaming endpoint for real-time responses.
+
+If `session_id` is provided but expired/invalid, stream emits `event: error`
+with `{"error":"session_expired", ...}` followed by `event: done`.
 
 ```bash
 curl -N http://localhost:8000/chat/stream \
@@ -227,6 +244,8 @@ curl -X POST http://localhost:8000/scope/select \
   }'
 ```
 
+If `session_id` is expired/missing, response is `404` with `{"detail":"session_expired"}`.
+
 #### GET /scope/options
 
 Get available scope options.
@@ -234,6 +253,8 @@ Get available scope options.
 ```bash
 curl "http://localhost:8000/scope/options?session_id=abc-123"
 ```
+
+If `session_id` is provided but invalid/expired, response is `404` with `{"detail":"session_expired"}`.
 
 ### Utility Endpoints
 
@@ -252,6 +273,7 @@ Pipeline-specific health check.
 ```bash
 curl http://localhost:8000/pipelines/health/inmate_data
 curl http://localhost:8000/pipelines/health/document_qa
+curl http://localhost:8000/pipelines/health/daily_activity
 ```
 
 #### POST /train
@@ -796,10 +818,19 @@ Officers are busy — they need quick, scannable answers.
 | `DOC_HYBRID_SEARCH`      | `true`                   | Enable BM25 + semantic hybrid       |
 | `VALKEY_HOST`            | `localhost`              | Redis/Valkey host for sessions      |
 | `VALKEY_PORT`            | `6379`                   | Redis/Valkey port                   |
+| `REDIS_HOST`             | `localhost`              | Local Redis host for STM            |
+| `REDIS_PORT`             | `6379`                   | Local Redis port for STM            |
+| `SESSION_BACKEND`        | `auto`                   | `auto`, `redis`, `valkey`, `memory` (tests only) |
+| `LOCAL_SESSION_BACKEND`  | `redis`                  | Local STM backend                   |
+| `PROD_SESSION_BACKEND`   | `valkey`                 | Prod/staging STM backend            |
+| `LTM_BACKEND`            | `auto`                   | `auto`, `sqlite`, `dynamodb`, `noop` (tests only) |
+| `LOCAL_LTM_BACKEND`      | `sqlite`                 | Local LTM backend                   |
+| `PROD_LTM_BACKEND`       | `dynamodb`               | Prod/staging LTM backend            |
+| `LOCAL_LTM_SQLITE_PATH`  | `./local/conversation_store.db` | Local SQLite LTM path         |
 | `SESSION_TTL_SECONDS`    | `3600`                   | Session timeout (1 hour)            |
 | `ENABLE_GUARDRAILS`      | `true`                   | Enable input validation             |
 | `MAX_QUERY_RESULTS`      | `500`                    | Max rows returned from SQL          |
-| `MAX_CONVERSATION_TURNS` | `15`                     | Max turns kept in session           |
+| `MAX_CONVERSATION_TURNS` | `15`                     | Max turns kept per scope in STM     |
 
 
 ### Pipeline-Specific Config
@@ -908,13 +939,31 @@ export OPENAI_API_KEY=sk-your-key-here
 
 #### "Session not found or expired"
 
-**Cause**: Session expired (default: 1 hour) or Valkey not running.
+**Cause**: Session expired (default: 1 hour) or configured STM backend unavailable.
 
 **Fix**:
 
 - Increase `SESSION_TTL_SECONDS`
 - Start a new session
-- For local dev, sessions are in-memory and reset on restart
+- Verify local Redis is running (default STM backend)
+- For tests only, use `SESSION_BACKEND=memory`
+
+#### "Session backend 'redis' is unavailable: Error 111 connecting to localhost:6379"
+
+**Cause**: Local Redis process is not running.
+
+**Fix**:
+
+```bash
+# Start Redis locally
+redis-server
+
+# Or run Redis in Docker
+docker run --name copilot-redis -p 6379:6379 -d redis:7
+
+# Then start app
+python -m local.server
+```
 
 #### "Unknown scope: xxx"
 
@@ -975,11 +1024,10 @@ LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
 
 | Task         | Command/Action                              |
 | ------------ | ------------------------------------------- |
-| Start server | `python -m local.server`                    |
+| Start server | `redis-server` then `python -m local.server` |
 | Open UI      | `http://localhost:8000`                     |
 | API docs     | `http://localhost:8000/docs`                |
 | Train Vanna  | `curl -X POST http://localhost:8000/train`  |
 | Ingest docs  | `python ingest_documents.py /path/to/docs/` |
 | Run tests    | `python -m pytest tests/ -v`                |
 | Health check | `curl http://localhost:8000/health`         |
-

@@ -1,39 +1,31 @@
 """
-Local Bootstrap — Wires moto DynamoDB + in-memory session store for local dev.
+Local Bootstrap — Wires runtime local backends for local dev.
 
-Production code in src/ uses abstract factories (create_session_store,
-create_conversation_store) which auto-detect available backends. This module
-pre-configures the local environment so those factories resolve correctly.
-
-Usage:
-    from local.bootstrap import bootstrap_local
-    stores = bootstrap_local()
+Uses the same production factories with local defaults:
+  - STM: redis
+  - LTM: sqlite
 """
 
 from __future__ import annotations
 
 import json
 import os
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
-os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
-os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
-os.environ.setdefault("USE_LOCAL_DYNAMO", "true")
+os.environ.setdefault("SESSION_BACKEND", "redis")
+os.environ.setdefault("LTM_BACKEND", "sqlite")
+os.environ.setdefault("LOCAL_SESSION_BACKEND", "redis")
+os.environ.setdefault("LOCAL_LTM_BACKEND", "sqlite")
 
-import boto3
-from moto import mock_aws
-
-from src.memory.conversation_store import ConversationStore, DynamoConversationStore
-from src.session.session_manager import InMemorySessionStore, SessionStore
-from src.shared.config import CONVERSATION_TABLE
+from src.memory.conversation_store import ConversationStore, create_conversation_store
+from src.session.session_manager import SessionStore, create_session_store
+from src.shared.config import REDIS_HOST, REDIS_PORT
 from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
-
-_mock_ctx = None
 
 LOCAL_DIR = Path(__file__).resolve().parent
 USERS_PATH = LOCAL_DIR / "users.json"
@@ -46,31 +38,12 @@ class LocalStores:
 
 
 def bootstrap_local() -> LocalStores:
-    """Set up moto DynamoDB + in-memory session store for local dev."""
-    global _mock_ctx
+    """Set up local runtime stores via shared factories."""
+    conversation_store = create_conversation_store()
+    _assert_local_redis_reachable()
+    session_store = create_session_store()
 
-    _mock_ctx = mock_aws()
-    _mock_ctx.start()
-
-    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
-    dynamodb.create_table(
-        TableName=CONVERSATION_TABLE,
-        KeySchema=[
-            {"AttributeName": "pk", "KeyType": "HASH"},
-            {"AttributeName": "sk", "KeyType": "RANGE"},
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "pk", "AttributeType": "S"},
-            {"AttributeName": "sk", "AttributeType": "S"},
-        ],
-        BillingMode="PAY_PER_REQUEST",
-    )
-    logger.info("Local moto DynamoDB table '%s' created", CONVERSATION_TABLE)
-
-    conversation_store = DynamoConversationStore()
-    session_store = InMemorySessionStore()
-
-    logger.info("Local bootstrap complete: InMemory sessions + Moto DynamoDB")
+    logger.info("Local bootstrap complete")
     return LocalStores(
         session_store=session_store,
         conversation_store=conversation_store,
@@ -84,8 +57,29 @@ def load_local_users() -> dict[str, Any]:
 
 
 def shutdown_local() -> None:
-    global _mock_ctx
-    if _mock_ctx:
-        _mock_ctx.stop()
-        _mock_ctx = None
-        logger.info("Local moto context stopped")
+    logger.info("Local shutdown complete")
+
+
+def _assert_local_redis_reachable() -> None:
+    backend = os.environ.get("SESSION_BACKEND", "redis").lower()
+    local_backend = os.environ.get("LOCAL_SESSION_BACKEND", "redis").lower()
+    if backend not in {"redis", "auto"}:
+        return
+    if backend == "auto" and local_backend != "redis":
+        return
+
+    host = os.environ.get("REDIS_HOST", REDIS_HOST)
+    port = int(os.environ.get("REDIS_PORT", str(REDIS_PORT)))
+
+    try:
+        with socket.create_connection((host, port), timeout=1.0):
+            return
+    except OSError as exc:
+        raise RuntimeError(
+            "Local STM backend 'redis' is configured but unreachable at "
+            f"{host}:{port}. Start Redis before running local.server.\n"
+            "Example commands:\n"
+            "  redis-server\n"
+            "or\n"
+            "  docker run --name copilot-redis -p 6379:6379 -d redis:7"
+        ) from exc

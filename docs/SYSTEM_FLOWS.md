@@ -44,11 +44,11 @@ User                          System                              Storage
   │  ┌────────────────────────────────────────────────────────────┐  │
   │  │ "Hi! I'm Sarah. How can I help you today?"                 │  │
   │  │                                                            │  │
-  │  │  ┌─────────────────┐  ┌─────────────────┐                 │  │
-  │  │  │ 📊 Inmate Data  │  │ 📄 Documents    │                 │  │
-  │  │  │ Query notes,    │  │ Search manuals, │                 │  │
-  │  │  │ inmates, logs   │  │ guides, SOPs    │                 │  │
-  │  │  └─────────────────┘  └─────────────────┘                 │  │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐│  │
+│  │  │ 📅 Daily Activity│ │ 📊 Inmate Data  │  │ 📄 Documents    ││  │
+│  │  │ Missed/upcoming  │ │ Query notes,    │  │ Search manuals, ││  │
+│  │  │ activity checks  │ │ inmates, logs   │  │ guides, SOPs    ││  │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────┘│  │
   │  └────────────────────────────────────────────────────────────┘  │
   │                              │                                    │
   │  Clicks "Inmate Data"        │                                    │
@@ -128,8 +128,8 @@ User                     Orchestrator              Pipeline                 Stor
   │                           │◀───────────────────────│                        │
   │                           │                        │                        │
   │                           │ 9. Save turn           │                        │
-  │                           │    ─────────────────────────────────────────────▶ Valkey (STM)
-  │                           │    ─────────────────────────────────────────────▶ DynamoDB (LTM)
+  │                           │    ─────────────────────────────────────────────▶ STM backend
+  │                           │    ─────────────────────────────────────────────▶ LTM backend
   │                           │                        │                        │
   │                           │ 10. Update scope ctx   │                        │
   │                           │     recent_queries +=  │                        │
@@ -245,7 +245,7 @@ User                     Orchestrator                              Storage
   │                           │ │                                    ││
   │                           │ │ 1. FREEZE inmate_data context      ││
   │                           │ │    scope_contexts["inmate_data"]=  ││────────▶│
-  │                           │ │    {                               ││  Valkey │
+  │                           │ │    {                               ││   STM   │
   │                           │ │      recent_entities: {            ││         │
   │                           │ │        inmate: "Anthony Nova"      ││         │
   │                           │ │      },                            ││         │
@@ -278,7 +278,7 @@ User                     Orchestrator                              Storage
   │                           │                                        │         │
   │                           │ RESTORE inmate_data context            │         │
   │                           │◀───────────────────────────────────────│─────────│
-  │                           │                                        │  Valkey │
+  │                           │                                        │   STM   │
   │                           │                                        │         │
   │◀──────────────────────────│                                        │         │
   │                           │                                        │         │
@@ -349,8 +349,8 @@ User                     Orchestrator              Pipeline                 Stor
   │                           │                        │                        │
   │                           │ 7. Save turn           │                        │
   │                           │    (scope: document_qa)│                        │
-  │                           │    ─────────────────────────────────────────────▶ Valkey
-  │                           │    ─────────────────────────────────────────────▶ DynamoDB
+  │                           │    ─────────────────────────────────────────────▶ STM backend
+  │                           │    ─────────────────────────────────────────────▶ LTM backend
   │                           │                        │                        │
   │◀──────────────────────────│                        │                        │
   │                           │                        │                        │
@@ -370,6 +370,43 @@ User                     Orchestrator              Pipeline                 Stor
   │ └─────────────────────────────────────────────────────────────────────────┘ │
   │                           │                        │                        │
   ▼                           ▼                        ▼                        ▼
+```
+
+---
+
+### Flow 6: Daily Activity Pipeline (Auto-Execute + Refresh)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                     DAILY ACTIVITY PIPELINE FLOW                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+User                     API/Orchestrator              Pipeline                Storage
+  │                             │                         │                       │
+  │ Click "Daily Activity"      │                         │                       │
+  │────────────────────────────▶│ POST /scope/select      │                       │
+  │                             │ {scope: daily_activity} │                       │
+  │                             │                         │                       │
+  │                             │ supports_auto_execute   │                       │
+  │                             │ = True                  │                       │
+  │                             │                         │                       │
+  │                             │ state_machine.handle_message("")                │
+  │                             │────────────────────────▶│                       │
+  │                             │                         │ 1. Load timetable     │
+  │                             │                         │ 2. Pull activity data │
+  │                             │                         │ 3. Compare expected   │
+  │                             │                         │    vs actual          │
+  │                             │                         │ 4. Summarize missed + │
+  │                             │                         │    upcoming activities│
+  │                             │◀────────────────────────│                       │
+  │                             │ Save turn pair (STM+LTM)                        │
+  │                             │────────────────────────────────────────────────▶│
+  │◀────────────────────────────│ Combined welcome + activity status              │
+  │                             │                                                 │
+  │ "refresh"                   │ /chat or /chat/stream                           │
+  │────────────────────────────▶│────────────────────────▶ recompute + summarize   │
+  │◀────────────────────────────│ updated status                                   │
+  ▼                             ▼                                                 ▼
 ```
 
 ---
@@ -396,15 +433,16 @@ Request:
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ 1. MIDDLEWARE                                                                    │
-│    - Extract customer_key from header/body                                      │
-│    - Validate auth token                                                         │
-│    - Rate limiting check                                                         │
+│    - Request logging + request-id header                                         │
+│    - CORS headers                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
                                         │
                                         ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ 2. SESSION RESOLUTION                                                            │
-│    - Load session from Valkey (or create new)                                   │
+│    - Load session from configured STM backend                                    │
+│    - If request provided session_id and not found: return session_expired       │
+│    - Create new session only when session_id is absent                          │
 │    - Resolve tenant context                                                      │
 │    - Check active_scope                                                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -421,7 +459,8 @@ Request:
 │ {                                 │ │     - is_recall()?                        │
 │   "requires_scope": true,         │ │     - is_help()?                          │
 │   "options": [                    │ │                                           │
-│     { "id": "inmate_data", ...},  │ │     If none → dispatch to pipeline        │
+│     { "id": "daily_activity", ...},│ │     If none → dispatch to pipeline       │
+│     { "id": "inmate_data", ...},  │ │                                           │
 │     { "id": "document_qa", ...}   │ │                                           │
 │   ]                               │ │                                           │
 │ }                                 │ │                                           │
@@ -465,7 +504,8 @@ Request:
                 │
                 ▼
 ┌─────────────────────────────────────────┐
-│ 1. Load session from Valkey             │
+│ 1. Load session from STM backend        │
+│    - if missing: return session_expired │
 │ 2. Validate scope exists in registry    │
 │ 3. Freeze current scope context         │
 │ 4. Update active_scope                  │
@@ -477,7 +517,7 @@ Request:
                 ▼
 Response:
 {
-    "message": "Now helping with Documents...",
+    "summary": "Now helping with Documents...",
     "scope": "document_qa",
     "previous_scope": "inmate_data"
 }
@@ -487,11 +527,11 @@ Response:
 
 ## Memory & State Flows
 
-### STM (Short-Term Memory) — Valkey
+### STM (Short-Term Memory) — Redis/Valkey
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        VALKEY SESSION STRUCTURE                                  │
+│                    SESSION STRUCTURE (Redis / Valkey)                            │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
 Key: "session:{session_id}"
@@ -538,7 +578,7 @@ Value (JSON):
         }
     },
 
-    "turns": [                                // Last 15 turns
+    "turns": [                                // Rolling STM window: last 15 turns per scope
         {
             "role": "user",
             "content": "fire watch notes from today",
@@ -560,23 +600,15 @@ Value (JSON):
 }
 ```
 
-### LTM (Long-Term Memory) — DynamoDB
+### LTM (Long-Term Memory) — SQLite / DynamoDB
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                        DYNAMODB CONVERSATION STORE                               │
+│                    CONVERSATION STORE (LTM BACKEND)                              │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
-Table: InmateCopilot-Conversations
-
-Partition Key: "pk" = "{customer_key}#{user_id}"
-Sort Key: "sk" = "{session_id}#{timestamp}"
-
-Item Structure:
+Storage schema (conceptual):
 {
-    "pk": "demo#richard.bell",
-    "sk": "abc-123#1710864000",
-
     "session_id": "abc-123-def-456",
     "customer_key": "demo",
     "user_id": "richard.bell",
@@ -589,22 +621,25 @@ Item Structure:
     "row_count": null,
 
     "timestamp": 1710864000,
-    "ttl": 1718640000                     // 90 days from now
+    "metadata": {...}
 }
 
 Queries:
 ---------
 1. Get user's history (all scopes):
-   Query: pk = "demo#richard.bell"
-   ScanIndexForward: false (newest first)
+   Query: customer_key + user_id
+   Order: newest first
    Limit: 50
 
 2. Get user's history (specific scope):
-   Query: pk = "demo#richard.bell"
-   FilterExpression: scope = "inmate_data"
+   Query: customer_key + user_id + scope
 
 3. Get session turns:
-   Scan with FilterExpression: session_id = "abc-123"
+   Query: session_id = "abc-123"
+
+Backend mapping:
+- Local/dev: SQLite file (`LOCAL_LTM_SQLITE_PATH`)
+- Prod/staging: DynamoDB (`CONVERSATION_TABLE`)
 ```
 
 ---
@@ -727,9 +762,9 @@ active_scope = None
 │ "I'd love to help with that! Please select │
 │  an option above so I know how to assist." │
 │                                             │
-│  ┌───────────────┐  ┌───────────────┐      │
-│  │📊 Inmate Data │  │📄 Documents   │      │
-│  └───────────────┘  └───────────────┘      │
+│  ┌────────────────┐ ┌───────────────┐ ┌───────────────┐ │
+│  │📅 Daily Activity│ │📊 Inmate Data │ │📄 Documents   │ │
+│  └────────────────┘ └───────────────┘ └───────────────┘ │
 └─────────────────────────────────────────────┘
 ```
 
@@ -747,9 +782,9 @@ active_scope = None
 │ Response:                                   │
 │ BOT_GREETING (from config) + scope options │
 │                                             │
-│  ┌───────────────┐  ┌───────────────┐      │
-│  │📊 Inmate Data │  │📄 Documents   │      │
-│  └───────────────┘  └───────────────┘      │
+│  ┌────────────────┐ ┌───────────────┐ ┌───────────────┐ │
+│  │📅 Daily Activity│ │📊 Inmate Data │ │📄 Documents   │ │
+│  └────────────────┘ └───────────────┘ └───────────────┘ │
 └─────────────────────────────────────────────┘
 ```
 
@@ -780,27 +815,14 @@ active_scope = "document_qa"
 ```
 User returns after session expired (>1 hour)
 
-Session not found in Valkey
+Session not found in configured STM backend
         │
         ▼
 ┌─────────────────────────────────────────────┐
-│ 1. Create new session                       │
-│ 2. Check DynamoDB for user history          │
-│    Query: pk = "demo#richard.bell"          │
-│                                             │
-│ History found:                              │
-│ - Last session 2 hours ago                  │
-│ - Was asking about fire watch              │
-│                                             │
-│ Response:                                   │
-│ "Welcome back! I see you were previously   │
-│  working with Inmate Data. Would you like  │
-│  to continue there?"                        │
-│                                             │
-│  ┌───────────────┐  ┌───────────────┐      │
-│  │📊 Inmate Data │  │📄 Documents   │      │
-│  │ (recommended) │  │               │      │
-│  └───────────────┘  └───────────────┘      │
+│ If client sent session_id:                 │
+│   return explicit session_expired contract │
+│ If client did not send session_id:         │
+│   create new session                       │
 └─────────────────────────────────────────────┘
 ```
 

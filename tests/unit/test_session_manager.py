@@ -44,6 +44,20 @@ class TestSessionTurns:
             session.add_turn(ConversationTurn(role="user", content=f"Question {i}"))
         assert len(session.turns) == 15
 
+    def test_turn_limit_is_per_scope(self, session: Session):
+        session.switch_scope("inmate_data")
+        for i in range(20):
+            session.add_turn(ConversationTurn(role="user", content=f"Inmate {i}"))
+
+        session.switch_scope("document_qa")
+        for i in range(20):
+            session.add_turn(ConversationTurn(role="user", content=f"Document {i}"))
+
+        inmate_turns = session.get_turns_for_scope("inmate_data")
+        docs_turns = session.get_turns_for_scope("document_qa")
+        assert len(inmate_turns) == 15
+        assert len(docs_turns) == 15
+
     def test_history_prompt(self, session_with_history: Session):
         prompt = session_with_history.get_history_prompt()
         assert "Fire Watch" in prompt

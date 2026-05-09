@@ -135,9 +135,17 @@ class Session:
         turn.scope = turn.scope or self.active_scope
         self.turns.append(turn)
         self.last_active = time.time()
+        self._enforce_scope_window(turn.scope)
 
-        if len(self.turns) > MAX_CONVERSATION_TURNS:
-            self.turns = self.turns[-MAX_CONVERSATION_TURNS:]
+    def _enforce_scope_window(self, scope: str | None) -> None:
+        """Keep a per-scope rolling STM window."""
+        scoped_indexes = [i for i, t in enumerate(self.turns) if t.scope == scope]
+        overflow = len(scoped_indexes) - MAX_CONVERSATION_TURNS
+        if overflow <= 0:
+            return
+
+        remove_indexes = set(scoped_indexes[:overflow])
+        self.turns = [t for i, t in enumerate(self.turns) if i not in remove_indexes]
 
     def get_scope_context(self, scope: str | None = None) -> ScopeContext | None:
         """Get context for a scope (defaults to active)."""
@@ -165,13 +173,24 @@ class Session:
         return [t for t in self.turns if t.scope == scope]
 
     def get_history_prompt(self, max_turns: int = 2) -> str:
-        """Return last N turns for SQL context. Keep small to avoid confusing LLM."""
-        if not self.turns:
+        """Return scoped last N turns for SQL context."""
+        turns = self.get_turns_for_scope()
+        if not turns:
             return ""
         lines = []
-        for turn in self.turns[-max_turns:]:
+        for turn in turns[-max_turns:]:
             lines.append(f"{turn.role}: {turn.content}")
         return "\n".join(lines)
+
+    def get_last_turn(
+        self,
+        role: str | None = None,
+        scope: str | None = None,
+    ) -> ConversationTurn | None:
+        turns = self.get_turns_for_scope(scope)
+        if role is not None:
+            turns = [t for t in turns if t.role == role]
+        return turns[-1] if turns else None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""

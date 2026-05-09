@@ -2,6 +2,7 @@
 
 **Created**: 2026-03-19
 **Purpose**: Track what's included in V1, what's deferred to V2, and decisions made.
+**Runtime Note**: Production assumptions in this document use Valkey + DynamoDB; local runtime policy is Redis + SQLite.
 
 ---
 
@@ -50,8 +51,8 @@
 | Component | V1 Spec |
 |-----------|---------|
 | **Compute** | ECS Fargate (3 tasks × 0.5 vCPU × 2GB) |
-| **Sessions** | Valkey (ElastiCache t4g.small) |
-| **History** | DynamoDB (on-demand) |
+| **Sessions (STM)** | Redis (local), Valkey (prod/staging) |
+| **History (LTM)** | SQLite (local), DynamoDB (prod/staging) |
 | **Vector Store** | ChromaDB (persistent, tenant-isolated) |
 | **Target Scale** | 100 concurrent users |
 | **Estimated Cost** | ~$200/month |
@@ -66,7 +67,7 @@
 | `GET /scope/options` | New |
 | `GET /pipelines/health/{scope}` | New |
 | `GET /session/{id}` | Unchanged |
-| `GET /history` | Modified (scope filtering) |
+| `GET /history` | Modified (user-level turn history retrieval) |
 
 ### Quality Requirements
 
@@ -246,11 +247,11 @@
 
 ### 9. Memory Architecture
 
-**Decision**: STM (Valkey) + LTM (DynamoDB), both scope-aware
+**Decision**: Policy-driven STM/LTM with scope-aware persistence
 
 **Rationale**:
-- STM: Active session (1 hour), fast access
-- LTM: Full history (90 days), analytics potential
+- STM: Active session (1 hour), fast access (Redis local / Valkey prod)
+- LTM: Full history (SQLite local / DynamoDB prod), analytics potential
 - Both store scope tags for filtering
 
 ---

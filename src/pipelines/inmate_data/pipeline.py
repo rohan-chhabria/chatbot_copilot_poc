@@ -51,6 +51,7 @@ class InmateDataPipeline(Pipeline):
             self._vanna_pipeline = AgentPipeline(
                 session_store=self._session_store,
                 conversation_store=self._conversation_store,
+                manage_persistence=False,
             )
             logger.debug("Vanna pipeline initialized")
         return self._vanna_pipeline

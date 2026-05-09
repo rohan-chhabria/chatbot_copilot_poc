@@ -31,6 +31,7 @@ ENVIRONMENT: str = os.environ.get("ENVIRONMENT", "dev")
 DEPLOYMENT_ID: str = os.environ.get("DEPLOYMENT_ID", "localdev000")
 IS_LAMBDA: bool = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "") != ""
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
+IS_PRODUCTION_ENV: bool = ENVIRONMENT.lower() in {"prod", "production", "staging"}
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  LLM CONFIGURATION                                                     ║
@@ -85,7 +86,13 @@ def is_valid_tenant(customer_key: str) -> bool:
 VALKEY_HOST: str = os.environ.get("VALKEY_HOST", "localhost")
 VALKEY_PORT: int = int(os.environ.get("VALKEY_PORT", "6379"))
 VALKEY_DB: int = int(os.environ.get("VALKEY_DB", "0"))
+REDIS_HOST: str = os.environ.get("REDIS_HOST", VALKEY_HOST)
+REDIS_PORT: int = int(os.environ.get("REDIS_PORT", str(VALKEY_PORT)))
+REDIS_DB: int = int(os.environ.get("REDIS_DB", str(VALKEY_DB)))
 SESSION_TTL_SECONDS: int = int(os.environ.get("SESSION_TTL_SECONDS", "3600"))
+SESSION_BACKEND: str = os.environ.get("SESSION_BACKEND", "auto").lower()
+LOCAL_SESSION_BACKEND: str = os.environ.get("LOCAL_SESSION_BACKEND", "redis").lower()
+PROD_SESSION_BACKEND: str = os.environ.get("PROD_SESSION_BACKEND", "valkey").lower()
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  DYNAMODB (Conversation History)                                        ║
@@ -93,6 +100,13 @@ SESSION_TTL_SECONDS: int = int(os.environ.get("SESSION_TTL_SECONDS", "3600"))
 
 CONVERSATION_TABLE: str = os.environ.get(
     "CONVERSATION_TABLE", "InmateCopilot-Conversations-local"
+)
+LTM_BACKEND: str = os.environ.get("LTM_BACKEND", "auto").lower()
+LOCAL_LTM_BACKEND: str = os.environ.get("LOCAL_LTM_BACKEND", "sqlite").lower()
+PROD_LTM_BACKEND: str = os.environ.get("PROD_LTM_BACKEND", "dynamodb").lower()
+LOCAL_LTM_SQLITE_PATH: str = os.environ.get(
+    "LOCAL_LTM_SQLITE_PATH",
+    str(Path(__file__).resolve().parents[2] / "local" / "conversation_store.db"),
 )
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗

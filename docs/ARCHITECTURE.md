@@ -142,8 +142,8 @@ InmateCopilot V2 transforms from a single-purpose SQL chatbot into a **guided mu
 │   SESSION LAYER     │    │   MEMORY LAYER      │    │   DATA LAYER        │
 │                     │    │                     │    │                     │
 │  ┌───────────────┐  │    │  ┌───────────────┐  │    │  ┌───────────────┐  │
-│  │    Valkey     │  │    │  │   DynamoDB    │  │    │  │ Aurora MySQL  │  │
-│  │  (ElastiCache)│  │    │  │  (History)    │  │    │  │ (Inmate Data) │  │
+│  │ Redis/Valkey  │  │    │  │ SQLite/DynamoDB│ │    │  │ Aurora MySQL  │  │
+│  │   (STM)       │  │    │  │    (LTM)      │  │    │  │ (Inmate Data) │  │
 │  │               │  │    │  │               │  │    │  │               │  │
 │  │ - Session     │  │    │  │ - All turns   │  │    │  │ - dg_notes    │  │
 │  │ - Scope ctx   │  │    │  │ - Scope tags  │  │    │  │ - dg_tags     │  │
@@ -269,8 +269,7 @@ class Pipeline(ABC):
 ```
 src/session/
 ├── models.py           # Session, Turn, ScopeContext
-├── session_manager.py  # CRUD operations
-└── scope_context.py    # Scope-specific state
+└── session_manager.py  # Session backends + CRUD operations
 ```
 
 **Enhanced Session Model:**
@@ -313,19 +312,20 @@ class ConversationTurn:
 ### 5. Memory Layer
 
 ```
+src/session/
+└── session_manager.py         # STM backends (Redis/Valkey, policy-driven)
 src/memory/
-├── stm/
-│   └── session_store.py    # Valkey (short-term)
-└── ltm/
-    └── conversation_store.py  # DynamoDB (long-term)
+└── conversation_store.py      # LTM backends (SQLite/DynamoDB, policy-driven)
 ```
 
 **Memory Behavior:**
 
 | Memory | Storage | TTL | Content |
 |--------|---------|-----|---------|
-| **STM (Valkey)** | ElastiCache | 1 hour | Active session + scope contexts |
-| **LTM (DynamoDB)** | DynamoDB | 90 days | All turns with scope tags |
+| **STM (local)** | Redis | 1 hour | Active session + scope contexts |
+| **STM (prod/staging)** | Valkey (ElastiCache) | 1 hour | Active session + scope contexts |
+| **LTM (local)** | SQLite file | configurable | All turns with scope tags |
+| **LTM (prod/staging)** | DynamoDB | 90 days | All turns with scope tags |
 
 ---
 
@@ -393,7 +393,7 @@ User in "inmate_data" ─── clicks [Switch] ───▶ UI shows scope opti
 │   3. LOAD/CREATE new scope context                                             │
 │      session.scope_contexts["document_qa"] = ScopeContext(...)                 │
 │                                                                                 │
-│   4. PERSIST to Valkey                                                          │
+│   4. PERSIST to STM backend                                                     │
 │      session_store.save(session)                                               │
 └────────────────────────────────────────────────────────────────────────────────┘
                                                         │
@@ -402,7 +402,7 @@ User in "inmate_data" ─── clicks [Switch] ───▶ UI shows scope opti
 │ RESPONSE: Scope Welcome                                                         │
 │                                                                                 │
 │   {                                                                             │
-│       "message": "Now helping with Documents. What would you like to find?",   │
+│       "summary": "Now helping with Documents. What would you like to find?",   │
 │       "scope": "document_qa",                                                   │
 │       "previous_scope": "inmate_data"                                          │
 │   }                                                                             │

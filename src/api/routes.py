@@ -49,6 +49,10 @@ _conversation_store: ConversationStore | None = None
 _state_machine = None
 
 
+class SessionExpiredError(Exception):
+    """Raised when a provided session_id cannot be resumed."""
+
+
 def _get_session_store() -> SessionStore:
     global _session_store
     if _session_store is None:
@@ -89,6 +93,8 @@ def _resolve_session(request: ChatRequest):
 
     if request.session_id:
         session = store.get(request.session_id)
+        if session is None:
+            raise SessionExpiredError(request.session_id)
 
     if session is None:
         session = create_session(
@@ -117,11 +123,26 @@ async def chat(request: ChatRequest) -> ChatResponse:
         request.session_id[:12] if request.session_id else "new",
     )
 
-    _ensure_pipelines_registered()
-    session = _resolve_session(request)
+    try:
+        _ensure_pipelines_registered()
+        session = _resolve_session(request)
+    except SessionExpiredError:
+        return ChatResponse(
+            success=False,
+            session_id=request.session_id or "",
+            summary="Your previous session expired. Please start a new chat session.",
+            error="session_expired",
+            question=request.question,
+            row_count=0,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
 
-    state_machine = _get_state_machine()
+    try:
+        state_machine = _get_state_machine()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     try:
         logger.debug("Calling state_machine.handle_message...")
@@ -174,11 +195,39 @@ async def chat_stream(request: ChatRequest):
         request.session_id[:12] if request.session_id else "new",
     )
 
-    _ensure_pipelines_registered()
-    session = _resolve_session(request)
+    try:
+        _ensure_pipelines_registered()
+        session = _resolve_session(request)
+    except SessionExpiredError:
+        async def expired_session_generator():
+            yield {
+                "event": "error",
+                "data": json.dumps(
+                    {
+                        "error": "session_expired",
+                        "summary": "Your previous session expired. Please start a new chat session.",
+                    }
+                ),
+            }
+            yield {"event": "done", "data": ""}
+
+        return EventSourceResponse(expired_session_generator())
+    except RuntimeError as e:
+        async def backend_error_generator():
+            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": str(e)})}
+            yield {"event": "done", "data": ""}
+
+        return EventSourceResponse(backend_error_generator())
     logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
 
-    state_machine = _get_state_machine()
+    try:
+        state_machine = _get_state_machine()
+    except RuntimeError as e:
+        async def backend_error_generator():
+            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": str(e)})}
+            yield {"event": "done", "data": ""}
+
+        return EventSourceResponse(backend_error_generator())
 
     async def event_generator():
         yield {
@@ -237,26 +286,23 @@ async def chat_stream(request: ChatRequest):
 @router.post("/scope/select", response_model=ScopeSelectResponse)
 async def select_scope(request: ScopeSelectRequest) -> ScopeSelectResponse:
     """Select a scope (user clicked option block)."""
-    _ensure_pipelines_registered()
-
-    store = _get_session_store()
+    try:
+        _ensure_pipelines_registered()
+        store = _get_session_store()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     session = store.get(request.session_id)
 
     if not session:
-        # Session not found - need customer_key and user_id to create one
-        if not request.customer_key or not request.user_id:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Session {request.session_id} not found",
-            )
-        from src.session.models import create_session
-
-        session = create_session(
-            customer_key=request.customer_key,
-            user_id=request.user_id,
+        raise HTTPException(
+            status_code=404,
+            detail="session_expired",
         )
 
-    state_machine = _get_state_machine()
+    try:
+        state_machine = _get_state_machine()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     try:
         result = state_machine.select_scope(request.scope, session)
@@ -296,15 +342,23 @@ async def get_scope_options(
     user_id: str | None = Query(None),
 ) -> ScopeOptionsResponse:
     """Get available scope options."""
-    _ensure_pipelines_registered()
+    try:
+        _ensure_pipelines_registered()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     from src.session.models import create_session
 
-    store = _get_session_store()
+    try:
+        store = _get_session_store()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     session = None
 
     if session_id:
         session = store.get(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="session_expired")
 
     if session is None:
         session = create_session(
@@ -312,7 +366,10 @@ async def get_scope_options(
             user_id=user_id or "anonymous",
         )
 
-    state_machine = _get_state_machine()
+    try:
+        state_machine = _get_state_machine()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     result = state_machine.get_scope_options(session)
 
     return ScopeOptionsResponse(
@@ -344,7 +401,10 @@ async def health() -> HealthResponse:
 
 @router.get("/session/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str) -> SessionResponse:
-    store = _get_session_store()
+    try:
+        store = _get_session_store()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     session = store.get(session_id)
 
     if not session:
@@ -366,7 +426,10 @@ async def get_session(session_id: str) -> SessionResponse:
 async def get_history(
     customer_key: str, user_id: str, limit: int = 50
 ) -> HistoryResponse:
-    conv_store = _get_conversation_store()
+    try:
+        conv_store = _get_conversation_store()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
     turns = conv_store.get_history(customer_key, user_id, limit=limit)
     return HistoryResponse(turns=turns, total=len(turns))
 

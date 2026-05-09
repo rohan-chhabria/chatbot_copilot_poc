@@ -11,7 +11,7 @@ from src.session.models import (
     create_session,
 )
 from src.session.session_manager import (
-    InMemorySessionStore,
+    RedisSessionStore,
     SessionStore,
     ValkeySessionStore,
     create_session_store,
@@ -22,8 +22,8 @@ __all__ = [
     "ConversationTurn",
     "ScopeContext",
     "SessionStore",
+    "RedisSessionStore",
     "ValkeySessionStore",
-    "InMemorySessionStore",
     "create_session",
     "create_session_store",
 ]

@@ -38,7 +38,7 @@ Officers check missed and upcoming scheduled activities:
 | Type "refresh" | Re-runs activity check → displays updated status |
 | Activity comparison | Compares timetable schedule against database records |
 
-The system maintains **multi-turn conversations** (up to 15 turns per session) with **scope isolation** — switching between pipelines preserves context for when you return.
+The system maintains **multi-turn conversations** (up to 15 turns per scope in STM) with **scope isolation** — switching between pipelines preserves context for when you return.
 
 ---
 
@@ -109,7 +109,7 @@ The system maintains **multi-turn conversations** (up to 15 turns per session) w
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                              STORAGE LAYER                                       │
 │   ┌─────────────────┐  ┌─────────────────┐  ┌────────────────────────────────┐ │
-│   │ Valkey          │  │ DynamoDB        │  │ ChromaDB                       │ │
+│   │ Redis/Valkey    │  │ SQLite/DynamoDB │  │ ChromaDB                       │ │
 │   │ (Sessions/STM)  │  │ (History/LTM)   │  │ (Vanna training + Doc vectors) │ │
 │   └─────────────────┘  └─────────────────┘  └────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -215,10 +215,10 @@ chatbot_copilot_poc/
 │   │
 │   ├── session/
 │   │   ├── models.py                    # Session model with scope context
-│   │   └── session_manager.py           # Valkey-backed session store
+│   │   └── session_manager.py           # Policy-driven session store (Redis/Valkey)
 │   │
 │   ├── memory/
-│   │   └── conversation_store.py        # DynamoDB conversation history
+│   │   └── conversation_store.py        # Policy-driven conversation history (SQLite/DynamoDB)
 │   │
 │   ├── tenant/
 │   │   ├── tenant_router.py             # customer_key → DB resolver
@@ -310,6 +310,10 @@ print(f"Total chunks: {stats['total_chunks']}")
 ### 5. Run the Server
 
 ```bash
+# Start local STM backend (required)
+redis-server
+# or: docker run --name copilot-redis -p 6379:6379 -d redis:7
+
 # Local development server
 python -m local.server
 
@@ -349,6 +353,9 @@ PYTHONPATH=. pytest src/pipelines/daily_activity/tests/ -v  # Daily activity pip
 | `/scope/select` | POST | Select active scope |
 | `/scope/options` | GET | Get available scopes |
 | `/health` | GET | Health check |
+| `/session/{session_id}` | GET | Session metadata |
+| `/history` | GET | User-level turn history |
+| `/pipelines/health/{scope}` | GET | Pipeline-specific health |
 | `/train` | POST | Trigger Vanna training |
 
 ### POST /chat — Main Conversation
@@ -370,21 +377,23 @@ PYTHONPATH=. pytest src/pipelines/daily_activity/tests/ -v  # Daily activity pip
     "success": true,
     "session_id": "a1b2c3d4-...",
     "summary": "Found 45 inmates on Fire Watch across 3 facilities.",
-    "data": [{"facility": "Main Block", "count": 20}],
     "row_count": 3,
-    "sql": "SELECT f.facility, COUNT(*) ...",
-    "scope": "inmate_data"
+    "scope": "inmate_data",
+    "requires_scope": false
 }
 ```
 
 **Response (no scope selected):**
 ```json
 {
+    "success": true,
+    "session_id": "a1b2c3d4-...",
+    "summary": "I'd love to help with that! Please select an option so I know how to assist you.",
     "requires_scope": true,
-    "greeting": "Hello! I'm Sarah, your correctional facility assistant.",
     "options": [
-        {"id": "inmate_data", "name": "Inmate Data", "description": "Query operational data"},
-        {"id": "document_qa", "name": "Documents", "description": "Search policies and procedures"}
+        {"id": "daily_activity", "label": "Daily Activity", "description": "Check missed and upcoming scheduled activities"},
+        {"id": "inmate_data", "label": "Inmate Data", "description": "Query notes, inmates, officers, and facilities"},
+        {"id": "document_qa", "label": "Documents", "description": "Search manuals, guides, and policies"}
     ]
 }
 ```
@@ -395,7 +404,7 @@ PYTHONPATH=. pytest src/pipelines/daily_activity/tests/ -v  # Daily activity pip
 ```json
 {
     "session_id": "a1b2c3d4-...",
-    "scope_id": "document_qa"
+    "scope": "document_qa"
 }
 ```
 
@@ -403,10 +412,18 @@ PYTHONPATH=. pytest src/pipelines/daily_activity/tests/ -v  # Daily activity pip
 ```json
 {
     "success": true,
+    "session_id": "a1b2c3d4-...",
     "scope": "document_qa",
-    "message": "📄 Documents scope selected. Ask me about policies and procedures."
+    "summary": "Now helping with Documents..."
 }
 ```
+
+Session-expired contracts are endpoint-specific:
+- `/chat`: HTTP `200` with `{"success": false, "error": "session_expired", ...}`
+- `/chat/stream`: SSE `event:error` with `{"error":"session_expired", ...}` then `event:done`
+- `/scope/select` and `/scope/options`: HTTP `404` with `{"detail":"session_expired"}`
+
+For full backend consumption flow, see: `docs/API_ENDPOINTS_FLOW.md`.
 
 ---
 
@@ -573,6 +590,8 @@ LOG_LEVEL=DEBUG
 
 # Or export directly
 export LOG_LEVEL=DEBUG
+# Ensure Redis is running for local STM
+# redis-server
 python -m local.server
 ```
 
@@ -644,8 +663,8 @@ PYTHONPATH=. pytest tests/integration/ -v
 | **API** | FastAPI + Mangum | REST API + SSE streaming |
 | **Database** | Aurora MySQL | Read-only operational data |
 | **Vector Store** | ChromaDB | Training data + document embeddings |
-| **Sessions** | Valkey (ElastiCache) | Short-term conversation context |
-| **History** | DynamoDB | Long-term conversation persistence |
+| **Sessions (STM)** | Redis (local), Valkey (prod/staging) | Short-term conversation context |
+| **History (LTM)** | SQLite (local), DynamoDB (prod/staging) | Long-term conversation persistence |
 | **PDF Parsing** | pypdf | PDF text extraction |
 | **DOCX Parsing** | python-docx | Word document extraction |
 | **BM25** | rank-bm25 | Keyword search scoring |
@@ -736,6 +755,8 @@ rank-bm25>=0.2.2
 ### Local Development
 
 ```bash
+# Ensure local Redis is running first
+# redis-server
 python -m local.server
 ```
 

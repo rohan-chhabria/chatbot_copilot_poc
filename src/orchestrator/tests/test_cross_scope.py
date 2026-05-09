@@ -21,15 +21,35 @@ class MockPipeline(Pipeline):
         return {"status": "healthy"}
 
 
+class MockConversationStore:
+    def __init__(self, turns=None):
+        self._turns = turns or []
+
+    def get_user_turns(self, customer_key, user_id, limit=50, scope=None):
+        _ = customer_key
+        _ = user_id
+        turns = self._turns
+        if scope is not None:
+            turns = [t for t in turns if t.get("scope") == scope]
+        return turns[:limit]
+
+
 @pytest.fixture(autouse=True)
 def setup_registry():
     # Don't clear - just register if not already registered
-    if not ScopeRegistry.is_valid_scope("test_scope"):
-        ScopeRegistry.register(ScopeDefinition(
-            id="test_scope", label="Test", icon="🧪",
-            description="Test scope", category="Test",
-            pipeline_class=MockPipeline,
-        ))
+    scopes = [
+        ("test_scope", "Test"),
+        ("daily_activity", "Daily Activity"),
+        ("document_qa", "Documents"),
+        ("inmate_data", "Inmate Data"),
+    ]
+    for scope_id, scope_label in scopes:
+        if not ScopeRegistry.is_valid_scope(scope_id):
+            ScopeRegistry.register(ScopeDefinition(
+                id=scope_id, label=scope_label, icon="🧪",
+                description=f"{scope_label} scope", category="Test",
+                pipeline_class=MockPipeline,
+            ))
     yield
 
 
@@ -126,6 +146,107 @@ class TestRecall:
     def test_recall_empty_history(self, handler, session):
         result = handler.handle("what did I ask?", session)
         assert "No questions yet" in result["summary"]
+
+    def test_recall_with_active_scope_defaults_to_recent_scoped_stm(self, session):
+        session.switch_scope("test_scope")
+        session.add_turn(ConversationTurn(role="user", content="Current scoped question", scope="test_scope"))
+        store = MockConversationStore(
+            turns=[
+                {"content": "Earlier scoped question", "scope": "test_scope", "timestamp": 1700000000},
+                {"content": "Other scope question", "scope": "document_qa", "timestamp": 1700000001},
+            ]
+        )
+        handler = CrossScopeHandler(conversation_store=store)
+
+        result = handler.handle("what did i ask earlier?", session)
+        assert "Current scoped question" in result["summary"]
+        assert "Earlier scoped question" not in result["summary"]
+        assert "Other scope question" not in result["summary"]
+
+    def test_recall_current_scope_past_includes_ltm(self, session):
+        session.switch_scope("test_scope")
+        session.add_turn(ConversationTurn(role="user", content="Current scoped question", scope="test_scope"))
+        store = MockConversationStore(
+            turns=[
+                {"content": "Earlier scoped question", "scope": "test_scope", "timestamp": 1700000000},
+                {"content": "Other scope question", "scope": "document_qa", "timestamp": 1700000001},
+            ]
+        )
+        handler = CrossScopeHandler(conversation_store=store)
+
+        result = handler.handle("what all have i asked in the past?", session)
+        assert "Current scoped question" in result["summary"]
+        assert "Earlier scoped question" in result["summary"]
+        assert "Other scope question" not in result["summary"]
+
+    @pytest.mark.parametrize(
+        "prompt",
+        [
+            "what had i asked?",
+            "what all i had asked?",
+            "is that all i have asked?",
+            "what have i asked as of this moment?",
+            "what have i asked as of date?",
+            "what all have i asked totally",
+            "history?",
+            "history of what we have discussed?",
+            "what is my history?",
+            "what's my history?",
+            "what have i asked till date?",
+        ],
+    )
+    def test_recall_real_world_phrase_variants(self, handler, session, prompt):
+        session.add_turn(ConversationTurn(role="user", content="top 5 officers this month", scope="test_scope"))
+        session.add_turn(ConversationTurn(role="assistant", content="A response", scope="test_scope"))
+        session.switch_scope("test_scope")
+
+        result = handler.handle(prompt, session)
+        assert result is not None
+        assert result.get("is_recall") is True
+        assert "top 5 officers this month" in result["summary"]
+
+    def test_recall_without_active_scope_uses_current_session_only(self, session):
+        session.add_turn(ConversationTurn(role="user", content="Current session question"))
+        store = MockConversationStore(
+            turns=[{"content": "Long term question", "scope": "test_scope", "timestamp": 1700000000}]
+        )
+        handler = CrossScopeHandler(conversation_store=store)
+
+        result = handler.handle("what did i ask?", session)
+        assert "Current session question" in result["summary"]
+        assert "Long term question" not in result["summary"]
+
+    def test_recall_all_scopes_includes_all_ltm_scopes(self, session):
+        session.switch_scope("test_scope")
+        session.add_turn(ConversationTurn(role="user", content="Current scope prompt", scope="test_scope"))
+        store = MockConversationStore(
+            turns=[
+                {"content": "Inmate scope question", "scope": "inmate_data", "timestamp": 1700000000},
+                {"content": "Document scope question", "scope": "document_qa", "timestamp": 1700000001},
+            ]
+        )
+        handler = CrossScopeHandler(conversation_store=store)
+
+        result = handler.handle("show my conversation history across all scopes", session)
+        assert "Current scope prompt" in result["summary"]
+        assert "Inmate scope question" in result["summary"]
+        assert "Document scope question" in result["summary"]
+
+    def test_recall_in_general_includes_all_scopes(self, session):
+        session.switch_scope("daily_activity")
+        session.add_turn(ConversationTurn(role="user", content="Daily refresh", scope="daily_activity"))
+        store = MockConversationStore(
+            turns=[
+                {"content": "Documents census count", "scope": "document_qa", "timestamp": 1700000000},
+                {"content": "Top officers", "scope": "inmate_data", "timestamp": 1700000001},
+            ]
+        )
+        handler = CrossScopeHandler(conversation_store=store)
+
+        result = handler.handle("what have i asked in general?", session)
+        assert "Daily refresh" in result["summary"]
+        assert "Documents census count" in result["summary"]
+        assert "Top officers" in result["summary"]
 
 
 class TestSelfIdentity:

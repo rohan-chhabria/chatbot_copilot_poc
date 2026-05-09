@@ -3,6 +3,7 @@
 **Version**: 1.0
 **Created**: 2026-03-19
 **Target Scale**: V1 (100 concurrent users) → V2 (1000 users)
+**Scope Note**: This document models **production infra** (Valkey + DynamoDB). Local runtime policy uses Redis + SQLite.
 
 ---
 

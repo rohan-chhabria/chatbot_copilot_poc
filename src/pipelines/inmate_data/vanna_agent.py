@@ -28,6 +28,7 @@ from src.pipelines.inmate_data.guardrails.question_validator import validate_que
 from src.pipelines.inmate_data.guardrails.sql_validator import inject_filters, validate_and_fix_sql
 from src.memory.conversation_store import ConversationStore
 from src.session.models import ConversationTurn, Session
+from src.session.session_manager import SessionStore
 from src.shared.config import (
     CHROMA_STORAGE_DIR,
     ENABLE_GUARDRAILS,
@@ -277,9 +278,11 @@ class AgentPipeline:
         self,
         session_store: SessionStore,
         conversation_store: ConversationStore,
+        manage_persistence: bool = True,
     ) -> None:
         self._session_store = session_store
         self._conversation_store = conversation_store
+        self._manage_persistence = manage_persistence
 
     async def process_question(
         self,
@@ -293,8 +296,9 @@ class AgentPipeline:
             generate_response,
         )
 
-        has_history = len(session.turns) > 0
-        last_content = session.turns[-1].content if session.turns else ""
+        scoped_turns = session.get_turns_for_scope()
+        has_history = len(scoped_turns) > 0
+        last_content = scoped_turns[-1].content if scoped_turns else ""
         intent_result = classify_intent(question, has_history, last_content)
         logger.info(
             "Intent: %s (%.0f%%) for: %s",
@@ -378,8 +382,9 @@ class AgentPipeline:
             generate_response,
         )
 
-        has_history = len(session.turns) > 0
-        last_content = session.turns[-1].content if session.turns else ""
+        scoped_turns = session.get_turns_for_scope()
+        has_history = len(scoped_turns) > 0
+        last_content = scoped_turns[-1].content if scoped_turns else ""
         intent_result = classify_intent(question, has_history, last_content)
         logger.info(
             "Stream intent: %s (%.0f%%) for: %s",
@@ -454,7 +459,7 @@ class AgentPipeline:
 
     def _enrich_session_from_history(self, session: Session) -> None:
         """For returning users with no turns yet, load prior patterns from DynamoDB."""
-        if session.turns:
+        if session.get_turns_for_scope():
             return
         try:
             history = self._conversation_store.get_history(
@@ -471,6 +476,7 @@ class AgentPipeline:
                 hint = ConversationTurn(
                     role="system",
                     content=f"Returning user. Past queries: {summary}",
+                    scope=session.active_scope,
                 )
                 session.turns.insert(0, hint)
                 logger.info(
@@ -535,6 +541,8 @@ class AgentPipeline:
     def _save_turn(
         self, session: Session, question: str, sql: str, response: dict[str, Any],
     ) -> None:
+        if not self._manage_persistence:
+            return
         user_turn = ConversationTurn(role="user", content=question)
         assistant_turn = ConversationTurn(
             role="assistant",
@@ -552,6 +560,8 @@ class AgentPipeline:
         self, session: Session, question: str, response: dict[str, Any],
     ) -> None:
         """Save non-SQL conversational turns (greetings, capabilities, etc.)."""
+        if not self._manage_persistence:
+            return
         user_turn = ConversationTurn(role="user", content=question)
         assistant_turn = ConversationTurn(
             role="assistant",
@@ -560,12 +570,14 @@ class AgentPipeline:
         session.add_turn(user_turn)
         session.add_turn(assistant_turn)
         self._session_store.save(session)
+        self._conversation_store.save_turn(session, user_turn)
+        self._conversation_store.save_turn(session, assistant_turn)
 
     def _handle_history_recall(
         self, session: Session, question: str,
     ) -> dict[str, Any]:
         """Respond to 'what did I ask earlier' by summarizing conversation history."""
-        user_turns = [t for t in session.turns if t.role == "user"]
+        user_turns = [t for t in session.get_turns_for_scope() if t.role == "user"]
         if not user_turns:
             return {
                 "summary": "This is the beginning of our conversation — you haven't asked anything yet! What would you like to know?",
@@ -585,11 +597,15 @@ class AgentPipeline:
     def _save_and_return_error(
         self, session: Session, question: str, error: str,
     ) -> dict[str, Any]:
+        if not self._manage_persistence:
+            return format_error_response(error, question)
         user_turn = ConversationTurn(role="user", content=question)
         error_turn = ConversationTurn(role="assistant", content=f"Error: {error}")
         session.add_turn(user_turn)
         session.add_turn(error_turn)
         self._session_store.save(session)
+        self._conversation_store.save_turn(session, user_turn)
+        self._conversation_store.save_turn(session, error_turn)
         return format_error_response(error, question)
 
 
@@ -648,8 +664,9 @@ def _rewrite_follow_up(question: str, session: Session) -> str:
 def _extract_prior_entities(session: Session) -> dict[str, str]:
     """Scan recent turns to find the last referenced inmate name, topic, etc."""
     entities: dict[str, str] = {}
-    user_turns = [t for t in session.turns if t.role == "user"]
-    assistant_turns = [t for t in session.turns if t.role == "assistant"]
+    scoped_turns = session.get_turns_for_scope()
+    user_turns = [t for t in scoped_turns if t.role == "user"]
+    assistant_turns = [t for t in scoped_turns if t.role == "assistant"]
 
     for turn in reversed(user_turns[-5:]):
         content = turn.content

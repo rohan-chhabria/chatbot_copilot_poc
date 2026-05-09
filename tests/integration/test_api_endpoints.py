@@ -104,6 +104,27 @@ class TestChatEndpoint:
         })
         assert response.status_code == 422
 
+    @patch("src.api.routes._get_session_store")
+    def test_chat_with_missing_session_id_returns_session_expired(self, mock_store_fn, client):
+        mock_store = MagicMock()
+        mock_store.get.return_value = None
+        mock_store_fn.return_value = mock_store
+
+        response = client.post(
+            "/chat",
+            json={
+                "question": "hello",
+                "customer_key": "demo",
+                "user_id": "Test.Officer",
+                "session_id": "missing-session",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["error"] == "session_expired"
+
 
 class TestSessionEndpoint:
     @patch("src.api.routes._get_session_store")
@@ -200,3 +221,49 @@ class TestChatStreamEndpoint:
                 break
         assert result_payload is not None
         assert result_payload["is_greeting"] is True
+
+    @patch("src.api.routes._get_session_store")
+    def test_chat_stream_missing_session_id_emits_session_expired(self, mock_store_fn, client):
+        mock_store = MagicMock()
+        mock_store.get.return_value = None
+        mock_store_fn.return_value = mock_store
+
+        response = client.post(
+            "/chat/stream",
+            json={
+                "question": "hello",
+                "customer_key": "demo",
+                "user_id": "Test.Officer",
+                "session_id": "missing-session",
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.text
+        assert "session_expired" in body
+
+
+class TestScopeSessionContracts:
+    @patch("src.api.routes._get_session_store")
+    def test_scope_select_with_missing_session_returns_session_expired(self, mock_store_fn, client):
+        mock_store = MagicMock()
+        mock_store.get.return_value = None
+        mock_store_fn.return_value = mock_store
+
+        response = client.post(
+            "/scope/select",
+            json={"session_id": "missing-session", "scope": "inmate_data"},
+        )
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "session_expired"
+
+    @patch("src.api.routes._get_session_store")
+    def test_scope_options_with_missing_session_returns_session_expired(self, mock_store_fn, client):
+        mock_store = MagicMock()
+        mock_store.get.return_value = None
+        mock_store_fn.return_value = mock_store
+
+        response = client.get("/scope/options?session_id=missing-session")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "session_expired"

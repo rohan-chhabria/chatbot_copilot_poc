@@ -112,8 +112,7 @@ class DocumentQAPipeline(Pipeline):
         )
         logger.debug("Synthesis complete, answer length=%d", len(response.get("answer", "")))
 
-        # Update scope context
-        scope_context.add_query(question)
+        # Update scope entities (query logging handled at orchestrator level)
         scope_context.update_entity(
             "last_docs",
             [c["metadata"].get("filename") for c in chunks[:3]],
@@ -180,8 +179,7 @@ class DocumentQAPipeline(Pipeline):
 
         logger.debug("Stream synthesis complete")
 
-        # Update context
-        scope_context.add_query(question)
+        # Scope query logging is handled at orchestrator level.
 
     async def health(self) -> dict[str, Any]:
         """Health check."""

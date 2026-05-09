@@ -20,15 +20,31 @@ class MockPipeline(Pipeline):
     scope_label = "Mock"
     scope_icon = "🧪"
     scope_description = "Mock pipeline"
+    process_calls: list[str] = []
+    stream_calls: list[str] = []
     
     async def process(self, question, session, scope_context):
+        _ = session
+        _ = scope_context
+        self.__class__.process_calls.append(question)
         return {"summary": f"Mock response to: {question}", "row_count": 0}
     
     async def process_stream(self, question, session, scope_context):
+        _ = session
+        _ = scope_context
+        self.__class__.stream_calls.append(question)
         yield {"event": "result", "data": {"summary": "Mock"}}
     
     async def health(self):
         return {"status": "healthy"}
+
+
+class RecordingConversationStore:
+    def __init__(self):
+        self.saved = []
+
+    def save_turn(self, session, turn):
+        self.saved.append((session.session_id, turn.role, turn.content))
 
 
 def run_async(coro):
@@ -50,6 +66,8 @@ def setup_registry():
             pipeline_class=MockPipeline,
         )
         ScopeRegistry.register(defn)
+    MockPipeline.process_calls.clear()
+    MockPipeline.stream_calls.clear()
     yield
 
 
@@ -86,13 +104,15 @@ class TestScopeSelection:
         # First visit
         state_machine.select_scope("mock_scope", session)
         session.get_scope_context().add_query("Previous query")
-        
+        session.get_scope_context().update_entity("last_assistant_summary", "Old summary")
+
         # Switch away and back
         session.active_scope = None
         result = state_machine.select_scope("mock_scope", session)
-        
+
         assert "Welcome back" in result["summary"]
         assert "Previous query" in result["summary"]
+        assert "I last shared" not in result["summary"]
 
 
 class TestScopeOptions:
@@ -148,6 +168,90 @@ class TestMessageHandling:
         assert "Mock response to: Test question" in result["summary"]
         assert result["scope"] == "mock_scope"
 
+    def test_cross_scope_turns_are_persisted(self, session):
+        store = RecordingConversationStore()
+        machine = ScopeStateMachine(conversation_store=store)
+
+        _ = run_async(machine.handle_message("hello", session))
+
+        assert len(store.saved) == 2
+        assert store.saved[0][1] == "user"
+        assert store.saved[1][1] == "assistant"
+
+    def test_pipeline_turns_are_persisted(self, session):
+        store = RecordingConversationStore()
+        machine = ScopeStateMachine(conversation_store=store)
+        session.switch_scope("mock_scope")
+
+        _ = run_async(machine.handle_message("check inmates", session))
+
+        assert len(store.saved) == 2
+        assert store.saved[0][2] == "check inmates"
+
+    def test_continue_reuses_last_scoped_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("Where is inmate John?", session))
+
+        result = run_async(state_machine.handle_message("continue", session))
+        assert "Mock response to: Where is inmate John?" in result["summary"]
+        assert session.turns[-2].content == "continue"
+
+    def test_continue_on_that_reuses_last_scoped_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("tell me top 5 officers", session))
+
+        result = run_async(state_machine.handle_message("continue on that", session))
+        assert "Mock response to: tell me top 5 officers" in result["summary"]
+        assert session.turns[-2].content == "continue on that"
+        assert MockPipeline.process_calls[-1] == "tell me top 5 officers"
+
+    def test_continue_without_scoped_history_returns_hint(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        result = run_async(state_machine.handle_message("continue", session))
+        assert "don't have a recent question in this scope yet" in result["summary"]
+
+    def test_revisit_reuses_indexed_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("top 5 officers today?", session))
+        _ = run_async(state_machine.handle_message("in last 7 days", session))
+        _ = run_async(state_machine.handle_message("what have i asked?", session))
+
+        result = run_async(state_machine.handle_message("revisit 1", session))
+        assert "Mock response to: top 5 officers today?" in result["summary"]
+        assert session.turns[-2].content == "revisit 1"
+        assert MockPipeline.process_calls[-1] == "top 5 officers today?"
+
+    def test_revisit_question_from_list_reuses_indexed_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("top 5 officers today?", session))
+        _ = run_async(state_machine.handle_message("in last 7 days", session))
+        _ = run_async(state_machine.handle_message("what have i asked till date?", session))
+
+        result = run_async(state_machine.handle_message("revisit question 2 from list", session))
+        assert "Mock response to: in last 7 days" in result["summary"]
+        assert MockPipeline.process_calls[-1] == "in last 7 days"
+
+    def test_revisit_invalid_index_returns_guidance_without_pipeline_fallback(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("top 5 officers today?", session))
+        _ = run_async(state_machine.handle_message("what have i asked?", session))
+        before_calls = len(MockPipeline.process_calls)
+
+        result = run_async(state_machine.handle_message("revisit 9", session))
+        assert "couldn't find item 9" in result["summary"]
+        assert len(MockPipeline.process_calls) == before_calls
+
+    def test_revisit_stale_map_after_new_query_returns_guidance(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        _ = run_async(state_machine.handle_message("top 5 officers today?", session))
+        _ = run_async(state_machine.handle_message("what have i asked?", session))
+        _ = run_async(state_machine.handle_message("new query after recall", session))
+        before_calls = len(MockPipeline.process_calls)
+
+        result = run_async(state_machine.handle_message("revisit 1", session))
+        assert "Ask 'what have i asked?' first" in result["summary"]
+        assert len(MockPipeline.process_calls) == before_calls
+
 
 class TestStreamDispatch:
     def test_stream_requires_scope(self, state_machine, session):
@@ -185,3 +289,90 @@ class TestStreamDispatch:
         assert len(events) == 1
         assert events[0]["event"] == "result"
         assert events[0]["data"].get("is_greeting") is True
+
+    def test_stream_continue_reuses_last_scoped_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        run_async(state_machine.handle_message("Show inmates on fire watch", session))
+
+        async def collect_events():
+            events = []
+            async for event in state_machine.dispatch_stream("continue", session):
+                events.append(event)
+            return events
+
+        events = run_async(collect_events())
+        assert events[-1]["event"] == "result"
+        assert "Mock" in events[-1]["data"]["summary"]
+
+    def test_stream_continue_on_that_reuses_last_scoped_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        run_async(state_machine.handle_message("top 5 officers this month", session))
+
+        async def collect_events():
+            events = []
+            async for event in state_machine.dispatch_stream("continue on that", session):
+                events.append(event)
+            return events
+
+        events = run_async(collect_events())
+        assert events[-1]["event"] == "result"
+        assert "Mock" in events[-1]["data"]["summary"]
+        assert MockPipeline.stream_calls[-1] == "top 5 officers this month"
+
+    def test_stream_revisit_reuses_indexed_question(self, state_machine, session):
+        session.switch_scope("mock_scope")
+        run_async(state_machine.handle_message("census count", session))
+        run_async(state_machine.handle_message("chow call", session))
+        run_async(state_machine.handle_message("what is my history?", session))
+
+        async def collect_events():
+            events = []
+            async for event in state_machine.dispatch_stream("revisit 2", session):
+                events.append(event)
+            return events
+
+        events = run_async(collect_events())
+        assert events[-1]["event"] == "result"
+        assert MockPipeline.stream_calls[-1] == "chow call"
+
+    @pytest.mark.parametrize("scope_id", ["daily_activity", "document_qa", "inmate_data"])
+    def test_recall_phrase_matrix_non_stream(self, state_machine, session, scope_id):
+        if not ScopeRegistry.is_valid_scope(scope_id):
+            ScopeRegistry.register(ScopeDefinition(
+                id=scope_id,
+                label=scope_id.replace("_", " ").title(),
+                icon="🧪",
+                description=f"{scope_id} scope",
+                category="Testing",
+                pipeline_class=MockPipeline,
+            ))
+        session.switch_scope(scope_id)
+        _ = run_async(state_machine.handle_message("seed question", session))
+
+        result = run_async(state_machine.handle_message("what is my history?", session))
+        assert result.get("is_recall") is True
+        assert "seed question" in result["summary"]
+
+    @pytest.mark.parametrize("scope_id", ["daily_activity", "document_qa", "inmate_data"])
+    def test_recall_phrase_matrix_stream(self, state_machine, session, scope_id):
+        if not ScopeRegistry.is_valid_scope(scope_id):
+            ScopeRegistry.register(ScopeDefinition(
+                id=scope_id,
+                label=scope_id.replace("_", " ").title(),
+                icon="🧪",
+                description=f"{scope_id} scope",
+                category="Testing",
+                pipeline_class=MockPipeline,
+            ))
+        session.switch_scope(scope_id)
+        _ = run_async(state_machine.handle_message("seed question", session))
+
+        async def collect_events():
+            events = []
+            async for event in state_machine.dispatch_stream("what is my history?", session):
+                events.append(event)
+            return events
+
+        events = run_async(collect_events())
+        assert events[-1]["event"] == "result"
+        assert events[-1]["data"].get("is_recall") is True

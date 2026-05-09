@@ -1,13 +1,10 @@
 """
-Session Manager — Valkey-backed short-term conversation sessions.
+Session Manager — short-term conversation session storage.
 
-Stores active conversation context: user identity, facility scope, and
-recent turns. Falls back to in-memory dict when Valkey is unavailable.
-
-Session lifecycle:
-  1. Created on first request (or resumed from existing session_id)
-  2. Updated after each turn (question + response appended)
-  3. Expires after SESSION_TTL_SECONDS of inactivity
+Runtime policy:
+  - prod/staging: valkey
+  - local/dev: redis
+No silent runtime fallback is allowed.
 """
 
 from __future__ import annotations
@@ -16,7 +13,19 @@ import json
 import time
 from typing import Any
 
-from src.shared.config import SESSION_TTL_SECONDS, VALKEY_DB, VALKEY_HOST, VALKEY_PORT
+from src.shared.config import (
+    IS_PRODUCTION_ENV,
+    LOCAL_SESSION_BACKEND,
+    PROD_SESSION_BACKEND,
+    REDIS_DB,
+    REDIS_HOST,
+    REDIS_PORT,
+    SESSION_BACKEND,
+    SESSION_TTL_SECONDS,
+    VALKEY_DB,
+    VALKEY_HOST,
+    VALKEY_PORT,
+)
 from src.shared.logger import get_logger
 
 # Re-export models from the new location for backward compatibility
@@ -46,20 +55,58 @@ class SessionStore:
 class ValkeySessionStore(SessionStore):
 
     def __init__(self) -> None:
-        import redis
-        self._client = redis.Redis(
+        self._store = RedisSessionStore(
             host=VALKEY_HOST,
             port=VALKEY_PORT,
             db=VALKEY_DB,
+            backend_label="valkey",
+        )
+
+    @property
+    def _client(self):
+        return self._store._client
+
+    def get(self, session_id: str) -> Session | None:
+        return self._store.get(session_id)
+
+    def save(self, session: Session) -> None:
+        self._store.save(session)
+
+    def delete(self, session_id: str) -> None:
+        self._store.delete(session_id)
+
+
+class RedisSessionStore(SessionStore):
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        db: int,
+        backend_label: str = "redis",
+    ) -> None:
+        import redis
+
+        self._backend_label = backend_label
+        self._client = redis.Redis(
+            host=host,
+            port=port,
+            db=db,
             decode_responses=True,
             socket_connect_timeout=5,
             socket_timeout=5,
         )
-        logger.info("Valkey session store connected: %s:%d", VALKEY_HOST, VALKEY_PORT)
+        logger.info(
+            "%s session store connected: %s:%d/%d",
+            self._backend_label,
+            host,
+            port,
+            db,
+        )
 
     def get(self, session_id: str) -> Session | None:
         key = f"session:{session_id}"
-        logger.debug("ValkeySessionStore.get: %s", session_id[:12])
+        logger.debug("%s.get: %s", self._backend_label, session_id[:12])
         data = self._client.get(key)
         if not data:
             logger.debug("Session not found: %s", session_id[:12])
@@ -70,7 +117,8 @@ class ValkeySessionStore(SessionStore):
     def save(self, session: Session) -> None:
         key = f"session:{session.session_id}"
         logger.debug(
-            "ValkeySessionStore.save: %s (scope=%s, turns=%d)",
+            "%s.save: %s (scope=%s, turns=%d)",
+            self._backend_label,
             session.session_id[:12],
             session.active_scope,
             len(session.turns),
@@ -79,11 +127,12 @@ class ValkeySessionStore(SessionStore):
 
     def delete(self, session_id: str) -> None:
         key = f"session:{session_id}"
-        logger.debug("ValkeySessionStore.delete: %s", session_id[:12])
+        logger.debug("%s.delete: %s", self._backend_label, session_id[:12])
         self._client.delete(key)
 
 
 class InMemorySessionStore(SessionStore):
+    """Test-only in-memory session backend."""
 
     def __init__(self) -> None:
         self._store: dict[str, dict[str, Any]] = {}
@@ -116,14 +165,31 @@ class InMemorySessionStore(SessionStore):
         self._store.pop(session_id, None)
 
 
+def _resolve_session_backend() -> str:
+    if SESSION_BACKEND != "auto":
+        return SESSION_BACKEND
+    return PROD_SESSION_BACKEND if IS_PRODUCTION_ENV else LOCAL_SESSION_BACKEND
+
+
+def _build_redis_store(host: str, port: int, db: int, label: str) -> SessionStore:
+    store = RedisSessionStore(host=host, port=port, db=db, backend_label=label)
+    store._client.ping()
+    return store
+
+
 def create_session_store() -> SessionStore:
+    backend = _resolve_session_backend()
     try:
-        store = ValkeySessionStore()
-        store._client.ping()
-        return store
+        if backend == "valkey":
+            return _build_redis_store(VALKEY_HOST, VALKEY_PORT, VALKEY_DB, "valkey")
+        if backend == "redis":
+            return _build_redis_store(REDIS_HOST, REDIS_PORT, REDIS_DB, "redis")
+        if backend == "memory":
+            logger.warning("Using in-memory session backend (test-only mode)")
+            return InMemorySessionStore()
+        raise ValueError(f"Unsupported SESSION_BACKEND: {backend}")
     except Exception as e:
-        logger.warning("Valkey unavailable (%s), falling back to in-memory", str(e))
-        return InMemorySessionStore()
+        raise RuntimeError(f"Session backend '{backend}' is unavailable: {e}") from e
 
 
 __all__ = [
@@ -131,8 +197,8 @@ __all__ = [
     "ConversationTurn",
     "ScopeContext",
     "SessionStore",
+    "RedisSessionStore",
     "ValkeySessionStore",
-    "InMemorySessionStore",
     "create_session",
     "create_session_store",
 ]

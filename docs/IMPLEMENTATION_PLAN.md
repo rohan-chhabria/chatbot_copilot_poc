@@ -1,8 +1,8 @@
-# InmateCopilot — Implementation Plan
+# InmateCopilot — Implementation Plan (Historical)
 
 **Version**: 2.0
 **Created**: 2026-03-19
-**Status**: Ready for Implementation
+**Status**: Archived (implemented; keep for historical migration context)
 
 ---
 
@@ -162,7 +162,7 @@ src/
 │   ├── __init__.py
 │   ├── models.py                    # NEW: Session, Turn, ScopeContext
 │   ├── session_manager.py           # MODIFIED: Scope management
-│   └── scope_context.py             # NEW: ScopeContext handling
+│   └── models.py                    # ScopeContext kept in models.py
 │
 ├── memory/                          # ENHANCED
 │   ├── __init__.py
@@ -1885,7 +1885,6 @@ tests/
 | File | Purpose |
 |------|---------|
 | `src/session/models.py` | Session, Turn, ScopeContext dataclasses |
-| `src/session/scope_context.py` | ScopeContext utilities |
 | `src/pipelines/base.py` | Abstract Pipeline interface |
 | `src/pipelines/inmate_data/pipeline.py` | InmateDataPipeline wrapper |
 | `src/pipelines/document_qa/pipeline.py` | DocumentQAPipeline |

@@ -16,6 +16,8 @@ os.environ.setdefault("CONVERSATION_TABLE", "InmateCopilot-Conversations-test")
 os.environ.setdefault("VALKEY_HOST", "localhost")
 os.environ.setdefault("ENABLE_GUARDRAILS", "true")
 os.environ.setdefault("LOG_LEVEL", "DEBUG")
+os.environ.setdefault("SESSION_BACKEND", "memory")
+os.environ.setdefault("LTM_BACKEND", "noop")
 
 import boto3
 import pytest

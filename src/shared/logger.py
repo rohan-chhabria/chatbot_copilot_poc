@@ -1,9 +1,9 @@
 """
-InmateCopilot V1 — Structured Logging
-======================================
+InmateCopilot — Structured Logging
+===================================
 
 Single logger factory for consistent log formatting across all modules.
-Uses JSON-structured output in Lambda, human-readable locally.
+Uses JSON-structured output in production (ECS), human-readable locally.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from src.shared.config import IS_LAMBDA, LOG_LEVEL
+from src.shared.config import IS_PRODUCTION_ENV, LOG_LEVEL
 
 _CONFIGURED = False
 
@@ -37,7 +37,7 @@ def _configure_root() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(level)
 
-    if IS_LAMBDA:
+    if IS_PRODUCTION_ENV:
         fmt = logging.Formatter(
             '{"time":"%(asctime)s","level":"%(levelname)s",'
             '"module":"%(name)s","message":"%(message)s"}'

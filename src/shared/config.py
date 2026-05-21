@@ -29,9 +29,11 @@ load_dotenv(_env_path)
 
 ENVIRONMENT: str = os.environ.get("ENVIRONMENT", "dev")
 DEPLOYMENT_ID: str = os.environ.get("DEPLOYMENT_ID", "localdev000")
-IS_LAMBDA: bool = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "") != ""
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 IS_PRODUCTION_ENV: bool = ENVIRONMENT.lower() in {"prod", "production", "staging"}
+ALLOWED_ORIGINS: str = os.environ.get("ALLOWED_ORIGINS", "*")
+SENTRY_DSN: str = os.environ.get("SENTRY_DSN", "")
+CUSTOMER_CONFIG_TABLE: str = os.environ.get("CUSTOMER_CONFIG_TABLE", "")
 
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 # ║  LLM CONFIGURATION                                                     ║

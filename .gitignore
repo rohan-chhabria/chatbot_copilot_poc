@@ -48,3 +48,8 @@ graphify-out/
 .graphifyignore 
 
 .github/copilot-instructions.md
+
+.agents/
+skills-lock.json
+
+workflow/

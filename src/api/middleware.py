@@ -55,12 +55,14 @@ class CORSHeaders(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
+        from src.shared.config import ALLOWED_ORIGINS
+
         if request.method == "OPTIONS":
             response = Response(status_code=200)
         else:
             response = await call_next(request)
 
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGINS
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Customer-Key"
         return response

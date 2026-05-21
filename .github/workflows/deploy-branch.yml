@@ -1,0 +1,137 @@
+# =============================================================================
+# Branch-based Auto Deployment — Docker Build + ECS Fargate
+# =============================================================================
+# - develop branch → deploys to 'dev' environment
+# - staging branch → deploys to 'staging' environment
+#
+# Prerequisites:
+#   - GitHub Environments: dev, staging (with optional reviewers)
+#   - Environment secrets: AWS_DEPLOY_ROLE_ARN, DEPLOYMENT_ID
+#   - CloudFormation stack deployed with infra/template.yaml
+# =============================================================================
+
+name: Deploy (Branch)
+
+on:
+  push:
+    branches: [develop, staging]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  lint:
+    name: Lint & Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install lint tools
+        run: pip install ruff bandit
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/ --output-format=github
+
+      - name: Security scan with bandit
+        run: bandit -r src/ --skip B101,B104,B108,B110,B311,B404,B603,B607
+
+  # ===========================================================================
+  # DEVELOP BRANCH → dev environment
+  # ===========================================================================
+  deploy-dev:
+    if: github.ref_name == 'develop'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
+          REPO="${{ steps.ecr-login.outputs.registry }}/inmate-copilot-${DEPLOY_ID}-dev"
+          docker build -t "${REPO}:${{ github.sha }}" -t "${REPO}:latest" .
+          docker push "${REPO}:${{ github.sha }}"
+          docker push "${REPO}:latest"
+
+      - name: Update ECS service
+        run: |
+          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
+          aws ecs update-service \
+            --cluster "InmateCopilot-${DEPLOY_ID}-dev" \
+            --service "InmateCopilot-${DEPLOY_ID}-dev" \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Summary
+        run: |
+          echo "## Deployed InmateCopilot to dev" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # STAGING BRANCH → staging environment
+  # ===========================================================================
+  deploy-staging:
+    if: github.ref_name == 'staging'
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        run: |
+          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
+          REPO="${{ steps.ecr-login.outputs.registry }}/inmate-copilot-${DEPLOY_ID}-staging"
+          docker build -t "${REPO}:${{ github.sha }}" -t "${REPO}:latest" .
+          docker push "${REPO}:${{ github.sha }}"
+          docker push "${REPO}:latest"
+
+      - name: Update ECS service
+        run: |
+          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
+          aws ecs update-service \
+            --cluster "InmateCopilot-${DEPLOY_ID}-staging" \
+            --service "InmateCopilot-${DEPLOY_ID}-staging" \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Summary
+        run: |
+          echo "## Deployed InmateCopilot to staging" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Region: \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY

@@ -370,7 +370,12 @@ async def get_scope_options(
         state_machine = _get_state_machine()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
-    result = state_machine.get_scope_options(session)
+
+    try:
+        result = state_machine.get_scope_options(session)
+    except Exception as e:
+        logger.exception("Failed to get scope options")
+        raise HTTPException(status_code=500, detail=f"Failed to load scope options: {str(e)}")
 
     return ScopeOptionsResponse(
         options=[
@@ -430,7 +435,13 @@ async def get_history(
         conv_store = _get_conversation_store()
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
-    turns = conv_store.get_history(customer_key, user_id, limit=limit)
+
+    try:
+        turns = conv_store.get_history(customer_key, user_id, limit=limit)
+    except Exception as e:
+        logger.exception("Failed to get history for user=%s", user_id)
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve history: {str(e)}")
+
     return HistoryResponse(turns=turns, total=len(turns))
 
 
@@ -438,7 +449,12 @@ async def get_history(
 async def train() -> TrainResponse:
     from src.training.trainer import train_from_defaults_async
 
-    result = await train_from_defaults_async()
+    try:
+        result = await train_from_defaults_async()
+    except Exception as e:
+        logger.exception("Training failed")
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+
     return TrainResponse(
         examples_trained=result.get("examples", 0),
         documentation_trained=result.get("documentation", 0),

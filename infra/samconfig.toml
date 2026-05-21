@@ -1,7 +1,56 @@
 version = 0.1
 
-[default.validate.parameters]
-template_file = "infra/template.yaml"
+[dev.deploy.parameters]
+stack_name = "InmateCopilot-V2-dev"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=dev",
+    "DeploymentId=REPLACE_ME0",
+    "VpcId=vpc-REPLACEME",
+    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
+    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
+    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-dev:latest",
+    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-dev-XXXXXX",
+]
 
-[default.build.parameters]
-use_container = false
+[staging.deploy.parameters]
+stack_name = "InmateCopilot-V2-staging"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=staging",
+    "DeploymentId=REPLACE_ME0",
+    "VpcId=vpc-REPLACEME",
+    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
+    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
+    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-staging:latest",
+    "ValkeyEndpoint=VALKEY_ENDPOINT_HERE",
+    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-staging-XXXXXX",
+    "SentryDsn=YOUR_SENTRY_DSN_HERE",
+    "AllowedOrigins=https://staging.yourdomain.com",
+]
+
+[prod.deploy.parameters]
+stack_name = "InmateCopilot-V2-prod"
+capabilities = "CAPABILITY_NAMED_IAM"
+confirm_changeset = true
+fail_on_empty_changeset = false
+region = "us-east-1"
+parameter_overrides = [
+    "Environment=prod",
+    "DeploymentId=REPLACE_ME0",
+    "VpcId=vpc-REPLACEME",
+    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
+    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
+    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-prod:latest",
+    "ValkeyEndpoint=VALKEY_ENDPOINT_HERE",
+    "CertificateArn=arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID_HERE",
+    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-prod-XXXXXX",
+    "SentryDsn=YOUR_SENTRY_DSN_HERE",
+    "AllowedOrigins=https://yourdomain.com",
+]

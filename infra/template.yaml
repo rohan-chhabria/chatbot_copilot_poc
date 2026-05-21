@@ -1,65 +1,69 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Transform: AWS::Serverless-2016-10-31
 Description: >
-  InmateCopilot V1 — Multi-tenant Intelligent Chatbot for Correctional Officers.
-  Text-to-SQL conversational AI with session management and conversation history.
-  Data sources are read-only Aurora MySQL endpoints per tenant.
-
-Globals:
-  Function:
-    Runtime: python3.10
-    Timeout: 60
-    MemorySize: 512
-    Environment:
-      Variables:
-        CONVERSATION_TABLE: !Ref ConversationTable
-        STRICT_TENANT_VALIDATION: !If [IsProd, "true", "false"]
-        LOG_LEVEL: !If [IsProd, "WARNING", "INFO"]
-        ENVIRONMENT: !Ref Environment
-        DEPLOYMENT_ID: !Ref DeploymentId
-        ENABLE_GUARDRAILS: "true"
+  InmateCopilot V2 — ECS Fargate deployment.
+  Multi-tenant chatbot with text-to-SQL, document QA, and daily activity pipelines.
 
 Parameters:
   Environment:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
-    Description: >
-      Deployment environment. Appended to all resource names for isolation
-      (e.g. InmateCopilot-Conversations-a1b2c3d4e5-dev).
+    Description: Deployment environment.
   DeploymentId:
     Type: String
     AllowedPattern: "[a-z0-9]{10}"
     ConstraintDescription: "Must be exactly 10 lowercase alphanumeric characters."
     Description: >
-      Unique 10-character ID per server/account. Generated ONCE during first
-      setup and reused for all subsequent deploys on that server.
+      Unique 10-character ID per deployment.
       Generate with: python3 -c "import uuid; print(uuid.uuid4().hex[:10])"
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for ECS tasks and ALB.
+  PublicSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Public subnets for the ALB (at least 2 AZs).
+  PrivateSubnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets for ECS tasks (at least 2 AZs).
+  ContainerImage:
+    Type: String
+    Description: Full ECR image URI (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot:latest).
   ValkeyEndpoint:
     Type: String
     Default: ""
-    Description: >
-      Valkey/ElastiCache endpoint for session storage.
-      Leave empty for in-memory fallback (dev mode).
-  TenantDbMap:
+    Description: ElastiCache Valkey endpoint for session storage.
+  CertificateArn:
     Type: String
     Default: ""
-    Description: >
-      JSON map of customer_key to DB connection params.
-      Stored in AWS Secrets Manager for production.
+    Description: ACM certificate ARN for HTTPS. Leave empty for HTTP-only (dev).
+  SentryDsn:
+    Type: String
+    Default: ""
+    Description: Sentry DSN for error monitoring.
+  AllowedOrigins:
+    Type: String
+    Default: "*"
+    Description: CORS allowed origins. Set to frontend domain in production.
+  OpenAiSecretArn:
+    Type: String
+    Description: Secrets Manager ARN containing OPENAI_API_KEY.
 
 Conditions:
   IsProd: !Equals [!Ref Environment, "prod"]
+  HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
   HasValkey: !Not [!Equals [!Ref ValkeyEndpoint, ""]]
+  HasSentry: !Not [!Equals [!Ref SentryDsn, ""]]
 
 Resources:
 
   # ─────────────────────────────────────────────────────────────────────────
-  #  DynamoDB: Conversation History (multi-tenant — pk = customer_key#user_id)
+  #  DynamoDB Tables
   # ─────────────────────────────────────────────────────────────────────────
 
   ConversationTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub "InmateCopilot-Conversations-${DeploymentId}-${Environment}"
       BillingMode: PAY_PER_REQUEST
@@ -77,107 +81,437 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
-  # ─────────────────────────────────────────────────────────────────────────
-  #  API Gateway
-  # ─────────────────────────────────────────────────────────────────────────
-
-  CopilotApi:
-    Type: AWS::Serverless::Api
+  CustomerConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      Name: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
-      StageName: Prod
-      MethodSettings:
-        - HttpMethod: "*"
-          ResourcePath: "/*"
-          ThrottlingBurstLimit: 100
-          ThrottlingRateLimit: 50
-      Cors:
-        AllowMethods: "'GET,POST,OPTIONS'"
-        AllowHeaders: "'Content-Type,Authorization,X-Customer-Key'"
-        AllowOrigin: "'*'"
+      TableName: !Sub "ChatbotCustomerConfiguration-${DeploymentId}-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: customer_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: customer_key
+          KeyType: HASH
 
   # ─────────────────────────────────────────────────────────────────────────
-  #  Lambda: Chatbot API
+  #  ECR Repository
   # ─────────────────────────────────────────────────────────────────────────
 
-  ChatbotFunction:
-    Type: AWS::Serverless::Function
+  EcrRepository:
+    Type: AWS::ECR::Repository
     Properties:
-      FunctionName: !Sub "InmateCopilot-Chatbot-${DeploymentId}-${Environment}"
-      Handler: src.api.handler.lambda_handler
-      CodeUri: ../
-      MemorySize: 1024
-      Timeout: 120
-      Environment:
-        Variables:
-          VALKEY_HOST: !If [HasValkey, !Ref ValkeyEndpoint, ""]
-          TENANT_DB_MAP: !Ref TenantDbMap
+      RepositoryName: !Sub "inmate-copilot-${DeploymentId}-${Environment}"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {
+            "rules": [
+              {
+                "rulePriority": 1,
+                "description": "Keep last 10 images",
+                "selection": {
+                  "tagStatus": "any",
+                  "countType": "imageCountMoreThan",
+                  "countNumber": 10
+                },
+                "action": {
+                  "type": "expire"
+                }
+              }
+            ]
+          }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  ECS Cluster
+  # ─────────────────────────────────────────────────────────────────────────
+
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  CloudWatch Log Group
+  # ─────────────────────────────────────────────────────────────────────────
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/inmate-copilot-${DeploymentId}-${Environment}"
+      RetentionInDays: !If [IsProd, 90, 30]
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  IAM Roles
+  # ─────────────────────────────────────────────────────────────────────────
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "InmateCopilot-ExecRole-${DeploymentId}-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref ConversationTable
-      Events:
-        ChatApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref CopilotApi
-            Path: /chat
-            Method: POST
-        HealthApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref CopilotApi
-            Path: /health
-            Method: GET
-        SessionApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref CopilotApi
-            Path: /session/{session_id}
-            Method: GET
-        HistoryApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref CopilotApi
-            Path: /history
-            Method: GET
+        - PolicyName: SecretsAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref OpenAiSecretArn
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "InmateCopilot-TaskRole-${DeploymentId}-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDbAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !GetAtt ConversationTable.Arn
+                  - !Sub "${ConversationTable.Arn}/index/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource:
+                  - !GetAtt CustomerConfigTable.Arn
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Security Groups
+  # ─────────────────────────────────────────────────────────────────────────
+
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB security group for InmateCopilot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ECS tasks security group for InmateCopilot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Application Load Balancer
+  # ─────────────────────────────────────────────────────────────────────────
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "IC-${DeploymentId}-${Environment}"
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref PublicSubnets
+      SecurityGroups:
+        - !Ref AlbSecurityGroup
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: "300"
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "IC-TG-${DeploymentId}-${Environment}"
+      Port: 8000
+      Protocol: HTTP
+      VpcId: !Ref VpcId
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - !If
+          - HasCertificate
+          - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: "443"
+              StatusCode: HTTP_301
+          - Type: forward
+            TargetGroupArn: !Ref TargetGroup
+
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificate
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  ECS Task Definition
+  # ─────────────────────────────────────────────────────────────────────────
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      Cpu: "512"
+      Memory: "2048"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: inmate-copilot
+          Image: !Ref ContainerImage
+          Essential: true
+          PortMappings:
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: ENVIRONMENT
+              Value: !Ref Environment
+            - Name: DEPLOYMENT_ID
+              Value: !Ref DeploymentId
+            - Name: CONVERSATION_TABLE
+              Value: !Ref ConversationTable
+            - Name: CUSTOMER_CONFIG_TABLE
+              Value: !Ref CustomerConfigTable
+            - Name: VALKEY_HOST
+              Value: !If [HasValkey, !Ref ValkeyEndpoint, ""]
+            - Name: SESSION_BACKEND
+              Value: auto
+            - Name: LTM_BACKEND
+              Value: auto
+            - Name: CHROMA_STORAGE_DIR
+              Value: /app/chroma_db
+            - Name: DOC_CHROMA_DIR
+              Value: /app/chroma_docs
+            - Name: ENABLE_GUARDRAILS
+              Value: "true"
+            - Name: LOG_LEVEL
+              Value: !If [IsProd, "WARNING", "INFO"]
+            - Name: STRICT_TENANT_VALIDATION
+              Value: !If [IsProd, "true", "false"]
+            - Name: SENTRY_DSN
+              Value: !If [HasSentry, !Ref SentryDsn, ""]
+            - Name: ALLOWED_ORIGINS
+              Value: !Ref AllowedOrigins
+          Secrets:
+            - Name: OPENAI_API_KEY
+              ValueFrom: !Ref OpenAiSecretArn
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 60
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: ecs
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  ECS Service
+  # ─────────────────────────────────────────────────────────────────────────
+
+  EcsService:
+    Type: AWS::ECS::Service
+    DependsOn: HttpListener
+    Properties:
+      ServiceName: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref TaskDefinition
+      DesiredCount: !If [IsProd, 3, 1]
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref PrivateSubnets
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+      LoadBalancers:
+        - ContainerName: inmate-copilot
+          ContainerPort: 8000
+          TargetGroupArn: !Ref TargetGroup
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      HealthCheckGracePeriodSeconds: 120
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Auto Scaling
+  # ─────────────────────────────────────────────────────────────────────────
+
+  ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId: !Sub "service/${EcsCluster}/${EcsService.Name}"
+      MinCapacity: !If [IsProd, 3, 1]
+      MaxCapacity: !If [IsProd, 15, 3]
+      RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+
+  CpuScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "InmateCopilot-CPU-${Environment}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70
+        ScaleOutCooldown: 60
+        ScaleInCooldown: 300
+
+  MemoryScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "InmateCopilot-Memory-${Environment}"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        TargetValue: 70
+        ScaleOutCooldown: 60
+        ScaleInCooldown: 300
 
   # ─────────────────────────────────────────────────────────────────────────
   #  CloudWatch Alarms
   # ─────────────────────────────────────────────────────────────────────────
 
-  ChatbotErrorAlarm:
+  CpuAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "InmateCopilot-Chatbot-Errors-${Environment}"
-      AlarmDescription: >
-        Fires when Chatbot Lambda has 5+ errors in 5 minutes.
-      Namespace: AWS/Lambda
-      MetricName: Errors
+      AlarmName: !Sub "InmateCopilot-CPU-High-${Environment}"
+      AlarmDescription: ECS service CPU utilization above 80% for 5 minutes.
+      Namespace: AWS/ECS
+      MetricName: CPUUtilization
       Dimensions:
-        - Name: FunctionName
-          Value: !Ref ChatbotFunction
-      Statistic: Sum
+        - Name: ClusterName
+          Value: !Ref EcsCluster
+        - Name: ServiceName
+          Value: !GetAtt EcsService.Name
+      Statistic: Average
       Period: 300
       EvaluationPeriods: 1
-      Threshold: 5
+      Threshold: 80
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
-  ChatbotDurationAlarm:
+  MemoryAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "InmateCopilot-Chatbot-Duration-${Environment}"
-      AlarmDescription: >
-        Fires when Chatbot avg duration exceeds 100s (timeout=120s).
-      Namespace: AWS/Lambda
-      MetricName: Duration
+      AlarmName: !Sub "InmateCopilot-Memory-High-${Environment}"
+      AlarmDescription: ECS service memory utilization above 85% for 5 minutes.
+      Namespace: AWS/ECS
+      MetricName: MemoryUtilization
       Dimensions:
-        - Name: FunctionName
-          Value: !Ref ChatbotFunction
+        - Name: ClusterName
+          Value: !Ref EcsCluster
+        - Name: ServiceName
+          Value: !GetAtt EcsService.Name
       Statistic: Average
       Period: 300
-      EvaluationPeriods: 2
-      Threshold: 100000
+      EvaluationPeriods: 1
+      Threshold: 85
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  Alb5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "InmateCopilot-ALB-5xx-${Environment}"
+      AlarmDescription: ALB returning more than 5% error rate.
+      Namespace: AWS/ApplicationELB
+      MetricName: HTTPCode_Target_5XX_Count
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  UnhealthyTargetsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "InmateCopilot-UnhealthyTargets-${Environment}"
+      AlarmDescription: ALB target group has unhealthy targets.
+      Namespace: AWS/ApplicationELB
+      MetricName: UnHealthyHostCount
+      Dimensions:
+        - Name: TargetGroup
+          Value: !GetAtt TargetGroup.TargetGroupFullName
+        - Name: LoadBalancer
+          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
@@ -185,8 +519,7 @@ Resources:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "InmateCopilot-Conversations-Throttles-${Environment}"
-      AlarmDescription: >
-        DynamoDB throttling on Conversation table.
+      AlarmDescription: DynamoDB throttling on Conversation table.
       Namespace: AWS/DynamoDB
       MetricName: ThrottledRequests
       Dimensions:
@@ -200,14 +533,22 @@ Resources:
       TreatMissingData: notBreaching
 
 Outputs:
-  ApiEndpoint:
-    Description: REST API base URL
-    Value: !Sub "https://${CopilotApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
-  ApiGatewayName:
-    Description: API Gateway name (visible in AWS Console)
-    Value: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
-  ChatbotFunctionName:
-    Description: Chatbot Lambda function name
-    Value: !Ref ChatbotFunction
+  AlbDnsName:
+    Description: ALB DNS name (use for Route 53 or direct access)
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  AlbUrl:
+    Description: ALB URL
+    Value: !If
+      - HasCertificate
+      - !Sub "https://${ApplicationLoadBalancer.DNSName}"
+      - !Sub "http://${ApplicationLoadBalancer.DNSName}"
+  EcsClusterName:
+    Value: !Ref EcsCluster
+  EcsServiceName:
+    Value: !GetAtt EcsService.Name
   ConversationTableName:
     Value: !Ref ConversationTable
+  CustomerConfigTableName:
+    Value: !Ref CustomerConfigTable
+  EcrRepositoryUri:
+    Value: !GetAtt EcrRepository.RepositoryUri

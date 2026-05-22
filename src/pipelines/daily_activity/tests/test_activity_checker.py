@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
 
 import pandas as pd
-import pytest
 
 from src.pipelines.daily_activity import activity_checker
 

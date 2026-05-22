@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.pipelines.inmate_data.guardrails import (
-    ValidationResult,
-    SQLValidationResult,
-    validate_question,
-    validate_and_fix_sql,
     inject_filters,
+    validate_and_fix_sql,
+    validate_question,
 )
 
 
@@ -35,7 +31,7 @@ class TestQuestionValidation:
         assert result.is_valid is False
 
     def test_too_short_question_invalid(self):
-        result = validate_question("hi")
+        validate_question("hi")
         # May be valid as a greeting, depends on implementation
 
 

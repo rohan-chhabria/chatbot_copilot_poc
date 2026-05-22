@@ -32,7 +32,7 @@ class TestDocumentQueryValidator:
         assert result.is_valid is False
 
     def test_too_short_query(self, validator):
-        result = validator.validate("hi")
+        validator.validate("hi")
         # May be invalid depending on min length
 
 

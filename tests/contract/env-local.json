@@ -1,0 +1,9 @@
+{
+  "id": "local-env",
+  "name": "Local Environment",
+  "values": [
+    {"key": "base_url", "value": "http://localhost:8000", "enabled": true},
+    {"key": "customer_key", "value": "demo", "enabled": true},
+    {"key": "user_id", "value": "test.newman", "enabled": true}
+  ]
+}

@@ -60,6 +60,7 @@ _DEFAULT_TENANT_DB: dict = {
         "user": os.environ.get("MYSQL_USER", "root"),
         "password": os.environ.get("MYSQL_PASSWORD", ""),
         "port": int(os.environ.get("MYSQL_PORT", "3306")),
+        "default_facility_ids": [63],
     }
 }
 

@@ -15,26 +15,26 @@ from src.shared.exceptions import ScopeError
 
 class MockPipeline(Pipeline):
     """Mock pipeline for testing."""
-    
+
     scope_id = "mock"
     scope_label = "Mock"
     scope_icon = "🧪"
     scope_description = "Mock pipeline"
     process_calls: list[str] = []
     stream_calls: list[str] = []
-    
+
     async def process(self, question, session, scope_context):
         _ = session
         _ = scope_context
         self.__class__.process_calls.append(question)
         return {"summary": f"Mock response to: {question}", "row_count": 0}
-    
+
     async def process_stream(self, question, session, scope_context):
         _ = session
         _ = scope_context
         self.__class__.stream_calls.append(question)
         yield {"event": "result", "data": {"summary": "Mock"}}
-    
+
     async def health(self):
         return {"status": "healthy"}
 
@@ -84,7 +84,7 @@ def session():
 class TestScopeSelection:
     def test_select_valid_scope(self, state_machine, session):
         result = state_machine.select_scope("mock_scope", session)
-        
+
         assert result["scope"] == "mock_scope"
         assert result["is_scope_change"] is True
         assert session.active_scope == "mock_scope"
@@ -96,7 +96,7 @@ class TestScopeSelection:
 
     def test_select_scope_returns_welcome(self, state_machine, session):
         result = state_machine.select_scope("mock_scope", session)
-        
+
         assert "summary" in result
         assert len(result["summary"]) > 0
 
@@ -118,7 +118,7 @@ class TestScopeSelection:
 class TestScopeOptions:
     def test_get_scope_options(self, state_machine, session):
         result = state_machine.get_scope_options(session)
-        
+
         assert "options" in result
         assert len(result["options"]) > 0
         # Check mock_scope is in the options (could be any position)
@@ -128,16 +128,16 @@ class TestScopeOptions:
     def test_options_mark_current_scope(self, state_machine, session):
         session.switch_scope("mock_scope")
         result = state_machine.get_scope_options(session)
-        
+
         mock_opt = next(o for o in result["options"] if o["id"] == "mock_scope")
         assert mock_opt["is_current"] is True
 
     def test_options_mark_visited_scopes(self, state_machine, session):
         session.switch_scope("mock_scope")
         session.active_scope = None  # Clear active but keep visited
-        
+
         result = state_machine.get_scope_options(session)
-        
+
         mock_opt = next(o for o in result["options"] if o["id"] == "mock_scope")
         assert mock_opt["is_visited"] is True
         assert mock_opt["is_current"] is False
@@ -146,25 +146,25 @@ class TestScopeOptions:
 class TestMessageHandling:
     def test_no_scope_prompts_selection(self, state_machine, session):
         result = run_async(state_machine.handle_message("Hello", session))
-        
+
         # Should either prompt for scope or handle greeting
         assert "summary" in result or "options" in result
 
     def test_greeting_handled_cross_scope(self, state_machine, session):
         result = run_async(state_machine.handle_message("Hello", session))
-        
+
         assert "is_greeting" in result or "requires_scope" in result
 
     def test_help_handled_cross_scope(self, state_machine, session):
         result = run_async(state_machine.handle_message("What can you do?", session))
-        
+
         assert "is_help" in result or "summary" in result
 
     def test_message_dispatched_to_pipeline(self, state_machine, session):
         session.switch_scope("mock_scope")
-        
+
         result = run_async(state_machine.handle_message("Test question", session))
-        
+
         assert "Mock response to: Test question" in result["summary"]
         assert result["scope"] == "mock_scope"
 
@@ -260,19 +260,19 @@ class TestStreamDispatch:
             async for event in state_machine.dispatch_stream("Test", session):
                 events.append(event)
             return events
-        
+
         events = run_async(collect_events())
         assert any(e.get("event") == "error" for e in events)
 
     def test_stream_with_scope(self, state_machine, session):
         session.switch_scope("mock_scope")
-        
+
         async def collect_events():
             events = []
             async for event in state_machine.dispatch_stream("Test", session):
                 events.append(event)
             return events
-        
+
         events = run_async(collect_events())
         assert len(events) > 0
 

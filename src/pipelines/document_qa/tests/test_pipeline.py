@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.session.models import create_session
 
 
 def _ensure_registered():
     """Ensure pipelines are registered."""
-    import src.pipelines.inmate_data  # noqa: F401
     import src.pipelines.document_qa  # noqa: F401
+    import src.pipelines.inmate_data  # noqa: F401
 
 
 class TestPipelineRegistration:
@@ -59,6 +57,6 @@ class TestScopeContextIntegration:
         session = create_session(customer_key="demo", user_id="Test")
         session.switch_scope("document_qa")
         ctx = session.get_scope_context()
-        
+
         assert ctx is not None
         assert ctx.scope == "document_qa"

@@ -16,17 +16,15 @@ import re
 import uuid
 from typing import Any, AsyncGenerator
 
+from src.memory.conversation_store import ConversationStore
+from src.pipelines.inmate_data.guardrails.question_validator import validate_question
+from src.pipelines.inmate_data.guardrails.sql_validator import inject_filters, validate_and_fix_sql
 from src.pipelines.inmate_data.prompt_builder import build_sql_context
 from src.pipelines.inmate_data.response_formatter import (
-    format_analytics_response,
-    format_data_response,
     format_empty_response,
     format_error_response,
     format_response_with_insights,
 )
-from src.pipelines.inmate_data.guardrails.question_validator import validate_question
-from src.pipelines.inmate_data.guardrails.sql_validator import inject_filters, validate_and_fix_sql
-from src.memory.conversation_store import ConversationStore
 from src.session.models import ConversationTurn, Session
 from src.session.session_manager import SessionStore
 from src.shared.config import (
@@ -290,11 +288,11 @@ class AgentPipeline:
         session: Session,
         tenant: TenantContext,
     ) -> dict[str, Any]:
-        from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
         from src.pipelines.inmate_data.domain_responses import (
             enrich_data_response,
             generate_response,
         )
+        from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
 
         scoped_turns = session.get_turns_for_scope()
         has_history = len(scoped_turns) > 0
@@ -376,11 +374,11 @@ class AgentPipeline:
         tenant: TenantContext,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Yields incremental SSE events as the pipeline progresses."""
-        from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
         from src.pipelines.inmate_data.domain_responses import (
             enrich_data_response,
             generate_response,
         )
+        from src.pipelines.inmate_data.intent_engine import Intent, classify_intent
 
         scoped_turns = session.get_turns_for_scope()
         has_history = len(scoped_turns) > 0
@@ -534,7 +532,7 @@ class AgentPipeline:
         """Build response using LLM-enhanced insight summarization."""
         if not rows:
             return format_empty_response(question, sql)
-        
+
         # Use insight-based summarization for better UX
         return await format_response_with_insights(rows, question, sql)
 

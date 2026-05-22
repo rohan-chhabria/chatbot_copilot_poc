@@ -21,6 +21,12 @@ services:
       AWS_ACCESS_KEY_ID: fakekey
       AWS_SECRET_ACCESS_KEY: fakesecret
       AWS_ENDPOINT_URL: http://dynamodb-local:8000
+      # MySQL (Aurora) connection
+      MYSQL_HOST: ${MYSQL_HOST:-demo-new-db-cluster.cluster-ro-cyxsij4cwahs.us-east-1.rds.amazonaws.com}
+      MYSQL_USER: ${MYSQL_USER:-Demo_aurora}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-N0t32023#d3m0}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-Demo_aurora}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
     depends_on:
       dynamodb-init:
         condition: service_completed_successfully

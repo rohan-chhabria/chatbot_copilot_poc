@@ -15,14 +15,13 @@ Tests cover:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
 import pytest
 
 from src.pipelines.daily_activity import activity_checker
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # FIXTURES
@@ -349,7 +348,7 @@ class TestRecordMatching:
     def test_record_matches_with_tolerance(self, sample_timetable: list[dict]):
         """Test that tolerance_minutes extends the matching window."""
         # Task ends at 04:00, record at 04:05 should match with 10min tolerance
-        task_end = datetime(2026, 3, 23, 4, 0)
+        datetime(2026, 3, 23, 4, 0)
         record_time = datetime(2026, 3, 23, 4, 5)
 
         cached_records = pd.DataFrame([{

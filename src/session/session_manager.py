@@ -13,6 +13,13 @@ import json
 import time
 from typing import Any
 
+# Re-export models from the new location for backward compatibility
+from src.session.models import (
+    ConversationTurn,
+    ScopeContext,
+    Session,
+    create_session,
+)
 from src.shared.config import (
     IS_PRODUCTION_ENV,
     LOCAL_SESSION_BACKEND,
@@ -27,14 +34,6 @@ from src.shared.config import (
     VALKEY_PORT,
 )
 from src.shared.logger import get_logger
-
-# Re-export models from the new location for backward compatibility
-from src.session.models import (
-    ConversationTurn,
-    Session,
-    ScopeContext,
-    create_session,
-)
 
 logger = get_logger(__name__)
 

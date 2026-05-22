@@ -80,13 +80,14 @@ def _get_state_machine():
 def _ensure_pipelines_registered():
     """Ensure pipelines are imported and registered."""
     import src.pipelines.daily_activity  # noqa: F401 - First for menu ordering
-    import src.pipelines.inmate_data  # noqa: F401
     import src.pipelines.document_qa  # noqa: F401
+    import src.pipelines.inmate_data  # noqa: F401
 
 
 def _resolve_session(request: ChatRequest):
     """Resolve or create a session for the request."""
     from src.session.models import create_session
+    from src.shared.config import TENANT_DB_MAP
 
     store = _get_session_store()
     session = None
@@ -97,10 +98,14 @@ def _resolve_session(request: ChatRequest):
             raise SessionExpiredError(request.session_id)
 
     if session is None:
+        facility_ids = request.facility_ids
+        if not facility_ids:
+            tenant_config = TENANT_DB_MAP.get(request.customer_key.strip().lower(), {})
+            facility_ids = tenant_config.get("default_facility_ids")
         session = create_session(
             customer_key=request.customer_key,
             user_id=request.user_id,
-            facility_ids=request.facility_ids,
+            facility_ids=facility_ids,
             role=request.role,
         )
         logger.info("New session: %s user=%s", session.session_id, request.user_id)
@@ -155,7 +160,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             result.get("row_count"),
             "error" in result,
         )
-        
+
         # Handle auto-execute for pipelines that support it (e.g., Daily Activity)
         # This handles the case where user selects scope by typing its name
         if result.get("auto_execute"):
@@ -163,7 +168,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
             combined_summary = result.get("summary", "") + "\n\n" + auto_result.get("summary", "")
             result["summary"] = combined_summary
             result["row_count"] = auto_result.get("row_count", 0)
-            
+
     except Exception as e:
         logger.exception("Pipeline error for session=%s", session.session_id)
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
@@ -213,8 +218,9 @@ async def chat_stream(request: ChatRequest):
 
         return EventSourceResponse(expired_session_generator())
     except RuntimeError as e:
+        error_detail = str(e)
         async def backend_error_generator():
-            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": str(e)})}
+            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": error_detail})}
             yield {"event": "done", "data": ""}
 
         return EventSourceResponse(backend_error_generator())
@@ -223,8 +229,9 @@ async def chat_stream(request: ChatRequest):
     try:
         state_machine = _get_state_machine()
     except RuntimeError as e:
+        error_detail = str(e)
         async def backend_error_generator():
-            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": str(e)})}
+            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": error_detail})}
             yield {"event": "done", "data": ""}
 
         return EventSourceResponse(backend_error_generator())
@@ -243,14 +250,14 @@ async def chat_stream(request: ChatRequest):
                     message=request.question,
                     session=session,
                 )
-                
+
                 # Handle auto-execute for pipelines that support it (e.g., Daily Activity)
                 if result.get("auto_execute"):
                     auto_result = await state_machine.handle_message("", session)
                     combined_summary = result.get("summary", "") + "\n\n" + auto_result.get("summary", "")
                     result["summary"] = combined_summary
                     result["row_count"] = auto_result.get("row_count", 0)
-                
+
                 _get_session_store().save(session)
                 yield {"event": "result", "data": json.dumps(result)}
             else:
@@ -306,17 +313,17 @@ async def select_scope(request: ScopeSelectRequest) -> ScopeSelectResponse:
 
     try:
         result = state_machine.select_scope(request.scope, session)
-        
+
         # Handle auto-execute for pipelines that support it (e.g., Daily Activity)
         if result.get("auto_execute"):
             # Trigger the pipeline through the normal async path with empty message
             auto_result = await state_machine.handle_message("", session)
-            
+
             # Combine welcome message with auto-execute result
             combined_summary = result.get("summary", "") + "\n\n" + auto_result.get("summary", "")
             result["summary"] = combined_summary
             result["row_count"] = auto_result.get("row_count", 0)
-        
+
     except ScopeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

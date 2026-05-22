@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.pipelines.daily_activity.pipeline import DailyActivityPipeline
 from src.pipelines.daily_activity import response_formatter
+from src.pipelines.daily_activity.pipeline import DailyActivityPipeline
 
 
 class TestDailyActivityPipeline:
@@ -95,7 +95,7 @@ class TestDailyActivityPipeline:
                 "row_count": 5,
             }
 
-            result = await pipeline.process(
+            await pipeline.process(
                 question="",
                 session=mock_session,
                 scope_context=mock_scope_context,

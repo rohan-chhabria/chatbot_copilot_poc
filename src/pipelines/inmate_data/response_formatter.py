@@ -41,35 +41,35 @@ async def format_response_with_insights(
 ) -> dict[str, Any]:
     """
     Format response using insight extraction + LLM summarization.
-    
+
     This is the primary formatter for complex queries. It:
     1. Extracts structured insights from rows (fast, deterministic)
     2. Sends insights to LLM for natural language summary (~1s)
     3. Returns a dense, officer-friendly summary
-    
+
     For simple count queries, skips LLM entirely for speed.
     """
     from src.pipelines.inmate_data.insight_extractor import InsightExtractor
     from src.pipelines.inmate_data.response_summarizer import ResponseSummarizer
-    
+
     # Filter sensitive columns first
     filtered = _filter_columns(rows)
-    
+
     # Extract insights
     extractor = InsightExtractor()
     insights = extractor.extract(filtered, question)
-    
+
     logger.debug(
         "Insights extracted: type=%s, count=%d, categories=%d",
         insights.query_type,
         insights.total_count,
         len(insights.top_categories),
     )
-    
+
     # Generate summary
     summarizer = ResponseSummarizer()
     summary = await summarizer.summarize(insights, question)
-    
+
     return {
         "summary": summary,
         "row_count": len(rows),
@@ -88,36 +88,36 @@ async def format_response_stream(
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream response generation for SSE.
-    
+
     Yields status events during insight extraction, then streams
     the LLM-generated summary token by token.
     """
     from src.pipelines.inmate_data.insight_extractor import InsightExtractor
     from src.pipelines.inmate_data.response_summarizer import ResponseSummarizer
-    
+
     yield {"event": "status", "data": "Analyzing results..."}
-    
+
     # Filter and extract insights
     filtered = _filter_columns(rows)
     extractor = InsightExtractor()
     insights = extractor.extract(filtered, question)
-    
+
     logger.debug(
         "Streaming insights: type=%s, count=%d",
         insights.query_type,
         insights.total_count,
     )
-    
+
     yield {"event": "status", "data": "Generating summary..."}
-    
+
     # Stream the summary
     summarizer = ResponseSummarizer()
     full_summary = ""
-    
+
     async for token in summarizer.summarize_stream(insights, question):
         full_summary += token
         yield {"event": "token", "data": token}
-    
+
     # Final result
     yield {
         "event": "result",

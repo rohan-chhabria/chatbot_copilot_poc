@@ -13,10 +13,10 @@ from src.session.models import ConversationTurn, create_session
 class MockPipeline(Pipeline):
     async def process(self, q, s, c):
         return {"summary": "Mock", "row_count": 0}
-    
+
     async def process_stream(self, q, s, c):
         yield {"event": "result", "data": {}}
-    
+
     async def health(self):
         return {"status": "healthy"}
 

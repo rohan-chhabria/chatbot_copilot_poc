@@ -7,9 +7,9 @@ Components:
 - CrossScopeHandler: Handles scope-agnostic interactions
 """
 
+from src.orchestrator.cross_scope import CrossScopeHandler
 from src.orchestrator.scope_registry import ScopeRegistry, register_pipeline
 from src.orchestrator.state_machine import ScopeStateMachine
-from src.orchestrator.cross_scope import CrossScopeHandler
 
 __all__ = [
     "ScopeRegistry",

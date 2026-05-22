@@ -113,7 +113,7 @@ def classify_intent(
 
     oos_match = _OUT_OF_SCOPE_PATTERNS.search(q)
     if oos_match:
-        data_match = _DATA_SIGNALS.search(q)
+        _DATA_SIGNALS.search(q)
         has_domain_subject = bool(re.search(
             r"(inmate|officer|note|entry|facility|round|watch|shift|keyword|status|movement)",
             q, re.IGNORECASE,

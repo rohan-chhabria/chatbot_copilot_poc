@@ -1,0 +1,333 @@
+{
+  "info": {
+    "name": "InmateCopilot API Contract Tests",
+    "description": "API contract validation for CI/CD pipeline",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000"},
+    {"key": "session_id", "value": ""},
+    {"key": "customer_key", "value": "demo"},
+    {"key": "user_id", "value": "test.contract"}
+  ],
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status healthy', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.eql('healthy');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pipelines/health/inmate_data",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/pipelines/health/inmate_data"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has status field', () => {",
+                  "  pm.expect(pm.response.json()).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Session Flow",
+      "item": [
+        {
+          "name": "POST /chat - Create Session",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"question\": \"hello\", \"customer_key\": \"{{customer_key}}\", \"user_id\": \"{{user_id}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has session_id', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('session_id');",
+                  "  pm.expect(json.session_id.length).to.be.greaterThan(0);",
+                  "  pm.collectionVariables.set('session_id', json.session_id);",
+                  "});",
+                  "pm.test('Success true', () => {",
+                  "  pm.expect(pm.response.json().success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /scope/options",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/scope/options?session_id={{session_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has 3 scopes', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.options.length).to.eql(3);",
+                  "});",
+                  "pm.test('Contains required scopes', () => {",
+                  "  const ids = pm.response.json().options.map(o => o.id);",
+                  "  pm.expect(ids).to.include('daily_activity');",
+                  "  pm.expect(ids).to.include('inmate_data');",
+                  "  pm.expect(ids).to.include('document_qa');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /scope/select - Inmate Data",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/scope/select",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"session_id\": \"{{session_id}}\", \"scope\": \"inmate_data\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Scope set correctly', () => {",
+                  "  pm.expect(pm.response.json().scope).to.eql('inmate_data');",
+                  "});",
+                  "pm.test('Has welcome summary', () => {",
+                  "  pm.expect(pm.response.json().summary.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /chat - With Scope",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"question\": \"how many notes today?\", \"customer_key\": \"{{customer_key}}\", \"user_id\": \"{{user_id}}\", \"session_id\": \"{{session_id}}\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has summary', () => {",
+                  "  pm.expect(pm.response.json()).to.have.property('summary');",
+                  "});",
+                  "pm.test('Has row_count', () => {",
+                  "  pm.expect(pm.response.json()).to.have.property('row_count');",
+                  "});",
+                  "pm.test('Scope is inmate_data', () => {",
+                  "  pm.expect(pm.response.json().scope).to.eql('inmate_data');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /session/{id}",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/session/{{session_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Session has correct scope', () => {",
+                  "  pm.expect(pm.response.json().active_scope).to.eql('inmate_data');",
+                  "});",
+                  "pm.test('Has turn_count', () => {",
+                  "  pm.expect(pm.response.json().turn_count).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Error Handling",
+      "item": [
+        {
+          "name": "POST /chat - Expired Session",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"question\": \"test\", \"customer_key\": \"demo\", \"user_id\": \"test\", \"session_id\": \"invalid-session-12345\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Success false', () => {",
+                  "  pm.expect(pm.response.json().success).to.eql(false);",
+                  "});",
+                  "pm.test('Error is session_expired', () => {",
+                  "  pm.expect(pm.response.json().error).to.eql('session_expired');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /scope/select - Invalid Scope",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/scope/select",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"session_id\": \"{{session_id}}\", \"scope\": \"invalid_scope\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pipelines/health - Invalid Scope",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/pipelines/health/nonexistent"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Daily Activity Auto-Execute",
+      "item": [
+        {
+          "name": "POST /chat - New Session for Daily",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/chat",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"question\": \"hi\", \"customer_key\": \"demo\", \"user_id\": \"test.daily\", \"facility_ids\": [63]}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('daily_session_id', pm.response.json().session_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /scope/select - Daily Activity (Auto-Execute)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/scope/select",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"session_id\": \"{{daily_session_id}}\", \"scope\": \"daily_activity\"}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Scope is daily_activity', () => {",
+                  "  pm.expect(pm.response.json().scope).to.eql('daily_activity');",
+                  "});",
+                  "pm.test('Summary not empty (auto-executed)', () => {",
+                  "  pm.expect(pm.response.json().summary.length).to.be.greaterThan(20);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

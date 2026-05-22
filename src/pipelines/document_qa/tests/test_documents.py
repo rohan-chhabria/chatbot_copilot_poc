@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
-from src.pipelines.document_qa.documents.models import Document, Chunk
 from src.pipelines.document_qa.documents.chunker import RecursiveChunker, chunk_document
+from src.pipelines.document_qa.documents.models import Chunk, Document
 
 
 class TestDocumentModel:

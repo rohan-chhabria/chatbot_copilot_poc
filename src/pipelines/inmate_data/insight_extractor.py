@@ -12,13 +12,11 @@ Design:
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from src.shared.constants import HIGHLIGHTER_MAP
 from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,27 +28,27 @@ class QueryInsights:
 
     query_type: str  # count, ranked, notes, movement, status_change, inmates, officers, facilities, generic
     total_count: int
-    
+
     # Date context
     date_range: tuple[date | None, date | None] = (None, None)
     peak_day: tuple[date | None, int] = (None, 0)
-    
+
     # Top categories (name -> count)
     top_categories: list[tuple[str, int]] = field(default_factory=list)
     top_officers: list[tuple[str, int]] = field(default_factory=list)
     top_facilities: list[tuple[str, int]] = field(default_factory=list)
     top_statuses: list[tuple[str, int]] = field(default_factory=list)
     top_inmates: list[tuple[str, int]] = field(default_factory=list)
-    
+
     # Flags and outliers
     red_flag_count: int = 0
     unique_inmates: int = 0
     unique_officers: int = 0
     unique_facilities: int = 0
-    
+
     # Aggregate values (for count queries)
     aggregate_values: dict[str, Any] = field(default_factory=dict)
-    
+
     # Sample data for context
     sample_descriptions: list[str] = field(default_factory=list)
 
@@ -58,7 +56,7 @@ class QueryInsights:
 class InsightExtractor:
     """
     Extracts structured insights from database query results.
-    
+
     Analyzes rows to compute statistics, trends, and notable patterns
     that can be summarized into natural language.
     """
@@ -71,20 +69,20 @@ class InsightExtractor:
         """Extract insights from query results."""
         if not rows:
             return QueryInsights(query_type="empty", total_count=0)
-        
+
         cols = self._lower_keys(rows[0])
         query_type = self._detect_query_type(rows, cols, question)
-        
+
         logger.debug(
             "Extracting insights: type=%s, rows=%d",
             query_type, len(rows),
         )
-        
+
         insights = QueryInsights(
             query_type=query_type,
             total_count=len(rows),
         )
-        
+
         # Extract type-specific insights
         extractors = {
             "count": self._extract_count_insights,
@@ -96,13 +94,13 @@ class InsightExtractor:
             "officers": self._extract_officers_insights,
             "facilities": self._extract_facilities_insights,
         }
-        
+
         extractor = extractors.get(query_type, self._extract_generic_insights)
         extractor(rows, question, insights)
-        
+
         # Common extractions for all types
         self._extract_common_insights(rows, insights)
-        
+
         return insights
 
     def _detect_query_type(
@@ -152,21 +150,21 @@ class InsightExtractor:
         count_key = self._find_count_key(rows[0])
         total = sum(self._safe_int(r.get(count_key, 0)) for r in rows)
         insights.aggregate_values["total"] = total
-        
+
         # Build top list
         name_keys = {
             "firstname", "lastname", "first_name", "last_name", "username",
             "emp_first_name", "emp_last_name", "inmate_name", "keyword_name",
             "facility", "facility_name",
         }
-        
+
         top_items = []
         for r in rows[:10]:
             name = self._extract_display_name(r, name_keys, count_key)
             count = self._safe_int(r.get(count_key, 0))
             if name:
                 top_items.append((name, count))
-        
+
         # Determine what's being ranked
         q_lower = question.lower()
         if "officer" in q_lower or "user" in q_lower:
@@ -191,18 +189,18 @@ class InsightExtractor:
         dates = self._extract_dates(rows, "note_date", "date_added")
         if dates:
             insights.date_range = (min(dates), max(dates))
-            
+
             # Peak day
             day_counts = Counter(d for d in dates)
             if day_counts:
                 peak = day_counts.most_common(1)[0]
                 insights.peak_day = peak
-        
+
         # Categories (keywords)
         kw_counts = self._count_field(rows, "keyword_name")
         if kw_counts:
             insights.top_categories = kw_counts.most_common(5)
-        
+
         # Officers
         officer_counts = self._count_field(rows, "officer_name")
         if not officer_counts:
@@ -213,14 +211,14 @@ class InsightExtractor:
         if officer_counts:
             insights.top_officers = officer_counts.most_common(5)
             insights.unique_officers = len(officer_counts)
-        
+
         # Red flags (highlighted entries)
         red_count = sum(
             1 for r in rows
             if r.get("highlighter_id") == 11 or "red" in str(r.get("highlighter", "")).lower()
         )
         insights.red_flag_count = red_count
-        
+
         # Sample descriptions
         for r in rows[:3]:
             desc = str(r.get("notes_description", ""))[:100]
@@ -238,7 +236,7 @@ class InsightExtractor:
         dates = self._extract_dates(rows, "date_added")
         if dates:
             insights.date_range = (min(dates), max(dates))
-        
+
         # Unique inmates
         inmates = set()
         for r in rows:
@@ -248,7 +246,7 @@ class InsightExtractor:
         insights.unique_inmates = len(inmates)
         if inmates:
             insights.top_inmates = [(name, 1) for name in list(inmates)[:5]]
-        
+
         # Facilities involved
         facilities = set()
         for r in rows:
@@ -271,7 +269,7 @@ class InsightExtractor:
         dates = self._extract_dates(rows, "note_date", "date_added")
         if dates:
             insights.date_range = (min(dates), max(dates))
-        
+
         # Status distribution
         status_counts = (
             self._count_field(rows, "status")
@@ -293,7 +291,7 @@ class InsightExtractor:
         if fac_counts:
             insights.top_facilities = fac_counts.most_common(5)
             insights.unique_facilities = len(fac_counts)
-        
+
         # Status distribution
         status_counts = (
             self._count_field(rows, "current_status")

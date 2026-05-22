@@ -9,7 +9,7 @@ dist/
 *.egg
 
 daily-activity-summary/
-
+sample_customer_config.json
 .env
 .env.*
 !.env.example

@@ -12,14 +12,33 @@ from typing import Any
 REFRESH_INSTRUCTION = '💡 Type "refresh" to update.'
 
 
-def _format_activity_list(activities: list[dict[str, Any]], max_items: int = 10) -> str:
-    """Format a list of activities as bullet points with full duration."""
+def _format_activity_list(
+    activities: list[dict[str, Any]], max_items: int = 10, include_ids: bool = False
+) -> str:
+    """Format a list of activities as bullet points with full duration.
+
+    Args:
+        activities: List of activity dicts with name, start_time, end_time, keyword_id, tag_status_id
+        max_items: Maximum items to show before truncating
+        include_ids: If True, include keyword_id and tag_status_id in output
+    """
     lines = []
     for activity in activities[:max_items]:
         name = activity["name"]
         start = activity["start_time"]
         end = activity["end_time"]
-        lines.append(f"- {name} ({start}-{end})")
+
+        if include_ids:
+            keyword_id = activity.get("keyword_id")
+            tag_status_id = activity.get("tag_status_id")
+            ids_str = ""
+            if keyword_id:
+                ids_str += f" [kw:{keyword_id}]"
+            if tag_status_id:
+                ids_str += f" [ts:{tag_status_id}]"
+            lines.append(f"- {name} ({start}-{end}){ids_str}")
+        else:
+            lines.append(f"- {name} ({start}-{end})")
 
     if len(activities) > max_items:
         lines.append(f"- ... and {len(activities) - max_items} more")
@@ -27,14 +46,34 @@ def _format_activity_list(activities: list[dict[str, Any]], max_items: int = 10)
     return "\n".join(lines)
 
 
-def _format_activity_inline(activities: list[dict[str, Any]], max_items: int = 5) -> str:
-    """Format activities inline with commas for compact display."""
+def _format_activity_inline(
+    activities: list[dict[str, Any]], max_items: int = 5, include_ids: bool = False
+) -> str:
+    """Format activities inline with commas for compact display.
+
+    Args:
+        activities: List of activity dicts
+        max_items: Maximum items to show
+        include_ids: If True, include keyword_id and tag_status_id
+    """
     items = []
     for activity in activities[:max_items]:
         name = activity["name"]
         start = activity["start_time"]
         end = activity["end_time"]
-        items.append(f"{name} ({start}-{end})")
+
+        if include_ids:
+            keyword_id = activity.get("keyword_id")
+            tag_status_id = activity.get("tag_status_id")
+            ids_parts = []
+            if keyword_id:
+                ids_parts.append(f"kw:{keyword_id}")
+            if tag_status_id:
+                ids_parts.append(f"ts:{tag_status_id}")
+            ids_str = f" [{','.join(ids_parts)}]" if ids_parts else ""
+            items.append(f"{name} ({start}-{end}){ids_str}")
+        else:
+            items.append(f"{name} ({start}-{end})")
 
     result = ", ".join(items)
     if len(activities) > max_items:

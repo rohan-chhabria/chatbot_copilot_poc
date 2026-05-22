@@ -10,9 +10,43 @@ V2 Additions:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# M1 fix: customer_key validation patterns
+# Supports numeric IDs (319, 14) or UUIDs (10337891-590c-11ed-9955-06b780df3818)
+_CUSTOMER_KEY_NUMERIC = re.compile(r"^\d+$")
+_CUSTOMER_KEY_UUID = re.compile(
+    r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.IGNORECASE
+)
+# For local testing, allow simple alphanumeric names (e.g., "demo", "test")
+_CUSTOMER_KEY_ALPHA = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,49}$")
+
+
+def _validate_customer_key(value: str) -> str:
+    """Validate customer_key format (M1 fix)."""
+    if not value or not value.strip():
+        raise ValueError("customer_key cannot be empty")
+
+    cleaned = value.strip()
+
+    # Max length check
+    if len(cleaned) > 50:
+        raise ValueError("customer_key too long (max 50 characters)")
+
+    # Accept numeric, UUID, or alphanumeric (for local testing)
+    if (
+        _CUSTOMER_KEY_NUMERIC.match(cleaned)
+        or _CUSTOMER_KEY_UUID.match(cleaned)
+        or _CUSTOMER_KEY_ALPHA.match(cleaned)
+    ):
+        return cleaned
+
+    raise ValueError(
+        "customer_key must be numeric, UUID, or alphanumeric (for testing)"
+    )
 
 
 class ChatRequest(BaseModel):
@@ -25,8 +59,17 @@ class ChatRequest(BaseModel):
     facility_ids: list[int] | None = Field(None, description="Facility scope filter")
     role: str = Field("officer", description="User role")
 
+    @field_validator("customer_key")
+    @classmethod
+    def validate_customer_key(cls, v: str) -> str:
+        return _validate_customer_key(v)
+
 
 class ChatResponse(BaseModel):
+    """
+    Generic chat response - core fields only.
+    Scope-specific data goes in the 'data' field.
+    """
     success: bool
     session_id: str
     summary: str = ""
@@ -38,6 +81,8 @@ class ChatResponse(BaseModel):
     scope: str | None = None
     requires_scope: bool = False
     options: list[dict] | None = None
+    # Scope-specific data (structure varies by scope)
+    data: dict | None = None
 
 
 class HealthResponse(BaseModel):

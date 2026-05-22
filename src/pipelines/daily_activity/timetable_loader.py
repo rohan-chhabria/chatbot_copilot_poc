@@ -1,10 +1,14 @@
 """
 Timetable Loader for Daily Activity Pipeline.
 
-Loads timetable JSON files with fallback logic:
-1. {TIMETABLE_DIR}/{customer_key}/{facility_id}.json — per-facility
-2. {TIMETABLE_DIR}/{customer_key}/default.json — per-tenant default
-3. {TIMETABLE_DIR}/default.json — global default
+Production: Loads timetable from DynamoDB customer config table.
+Fallback: Local JSON files for development/testing.
+
+Lookup order:
+1. DynamoDB customer config (timetables field) — production
+2. {TIMETABLE_DIR}/{customer_key}/{facility_id}.json — per-facility local
+3. {TIMETABLE_DIR}/{customer_key}/default.json — per-tenant default local
+4. {TIMETABLE_DIR}/default.json — global default local
 """
 
 from __future__ import annotations
@@ -45,15 +49,101 @@ def _try_load_json(path: Path) -> list[dict[str, Any]] | None:
         return None
 
 
+def _load_from_customer_config(customer_key: str, facility_id: int) -> list[dict[str, Any]] | None:
+    """
+    Load timetable from DynamoDB customer config.
+
+    Expected config structure:
+    {
+        "timetables": {
+            "63": [...timetable data...],   # per-facility
+            "default": [...timetable data...]  # fallback for all facilities
+        }
+    }
+    """
+    try:
+        from src.tenant.customer_config import get_customer_config
+
+        config = get_customer_config(customer_key)
+        timetables = config.get("timetables", {})
+
+        if not timetables:
+            return None
+
+        # Try facility-specific timetable first
+        facility_key = str(facility_id)
+        if facility_key in timetables:
+            timetable = timetables[facility_key]
+            if isinstance(timetable, str):
+                timetable = json.loads(timetable)
+            logger.info(
+                "Loaded timetable from customer config for customer=%s facility=%s",
+                customer_key,
+                facility_id,
+            )
+            return timetable
+
+        # Try default timetable for customer
+        if "default" in timetables:
+            timetable = timetables["default"]
+            if isinstance(timetable, str):
+                timetable = json.loads(timetable)
+            logger.info(
+                "Loaded default timetable from customer config for customer=%s",
+                customer_key,
+            )
+            return timetable
+
+        return None
+    except Exception as e:
+        logger.warning(
+            "Failed to load timetable from customer config for customer=%s: %s",
+            customer_key,
+            str(e),
+        )
+        return None
+
+
+def get_activity_config(customer_key: str) -> dict[str, Any]:
+    """
+    Get daily activity configuration from customer config.
+
+    Returns:
+        Dict with lookback_hours, lookahead_hours, tolerance_minutes
+    """
+    try:
+        from src.tenant.customer_config import get_customer_config
+
+        config = get_customer_config(customer_key)
+        return {
+            "lookback_hours": config.get("daily_activity_lookback_hours", 8.0),
+            "lookahead_hours": config.get("daily_activity_lookahead_hours", 4.0),
+            "tolerance_minutes": config.get("daily_activity_tolerance_minutes", 0),
+        }
+    except Exception as e:
+        logger.warning("Failed to get activity config for customer=%s: %s", customer_key, str(e))
+        from src.shared.config import (
+            DAILY_ACTIVITY_LOOKAHEAD_HOURS,
+            DAILY_ACTIVITY_LOOKBACK_HOURS,
+            DAILY_ACTIVITY_TOLERANCE_MINUTES,
+        )
+        return {
+            "lookback_hours": DAILY_ACTIVITY_LOOKBACK_HOURS,
+            "lookahead_hours": DAILY_ACTIVITY_LOOKAHEAD_HOURS,
+            "tolerance_minutes": DAILY_ACTIVITY_TOLERANCE_MINUTES,
+        }
+
+
 @lru_cache(maxsize=100)
 def load_timetable(customer_key: str, facility_id: int) -> list[dict[str, Any]]:
     """
     Load timetable with fallback logic.
 
     Lookup order:
-    1. {TIMETABLE_DIR}/{customer_key}/{facility_id}.json — per-facility
-    2. {TIMETABLE_DIR}/{customer_key}/default.json — per-tenant default
-    3. {TIMETABLE_DIR}/default.json — global default
+    1. DynamoDB customer config (timetables field) — production
+    2. {TIMETABLE_DIR}/{customer_key}/{facility_id}.json — per-facility local
+    3. {TIMETABLE_DIR}/{customer_key}/default.json — per-tenant default local
+    4. {TIMETABLE_DIR}/default.json — global default local
 
     Args:
         customer_key: Tenant identifier
@@ -65,6 +155,12 @@ def load_timetable(customer_key: str, facility_id: int) -> list[dict[str, Any]]:
     Raises:
         TimetableNotFoundError: If no timetable found at any level
     """
+    # Try customer config (DynamoDB) first
+    timetable = _load_from_customer_config(customer_key, facility_id)
+    if timetable is not None:
+        return timetable
+
+    # Fallback to local JSON files
     base_dir = _get_timetable_dir()
 
     paths_to_try = [

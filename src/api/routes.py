@@ -36,7 +36,7 @@ from src.api.schemas import (
 )
 from src.memory.conversation_store import ConversationStore, create_conversation_store
 from src.session.session_manager import SessionStore, create_session_store
-from src.shared.config import ENVIRONMENT
+from src.shared.config import ENVIRONMENT, SESSION_BACKEND
 from src.shared.exceptions import ScopeError
 from src.shared.logger import get_logger
 
@@ -141,13 +141,15 @@ async def chat(request: ChatRequest) -> ChatResponse:
             row_count=0,
         )
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Session backend unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
     logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
 
     try:
         state_machine = _get_state_machine()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("State machine unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     try:
         logger.debug("Calling state_machine.handle_message...")
@@ -169,12 +171,19 @@ async def chat(request: ChatRequest) -> ChatResponse:
             result["summary"] = combined_summary
             result["row_count"] = auto_result.get("row_count", 0)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Pipeline error for session=%s", session.session_id)
-        raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred processing your request")
 
     # Save session after processing
     _get_session_store().save(session)
+
+    # Build scope-specific data dict (exclude common fields)
+    common_keys = {
+        "summary", "row_count", "truncated", "error", "scope",
+        "requires_scope", "options", "auto_execute"
+    }
+    scope_data = {k: v for k, v in result.items() if k not in common_keys}
 
     return ChatResponse(
         success="error" not in result,
@@ -187,7 +196,16 @@ async def chat(request: ChatRequest) -> ChatResponse:
         scope=result.get("scope"),
         requires_scope=result.get("requires_scope", False),
         options=result.get("options"),
+        data=scope_data if scope_data else None,
     )
+
+
+def _make_error_stream(error_type: str, message: str):
+    """Helper to create SSE error stream (M6 fix - deduplicate)."""
+    async def generator():
+        yield {"event": "error", "data": json.dumps({"error": error_type, "message": message})}
+        yield {"event": "done", "data": ""}
+    return EventSourceResponse(generator())
 
 
 @router.post("/chat/stream")
@@ -204,37 +222,21 @@ async def chat_stream(request: ChatRequest):
         _ensure_pipelines_registered()
         session = _resolve_session(request)
     except SessionExpiredError:
-        async def expired_session_generator():
-            yield {
-                "event": "error",
-                "data": json.dumps(
-                    {
-                        "error": "session_expired",
-                        "summary": "Your previous session expired. Please start a new chat session.",
-                    }
-                ),
-            }
-            yield {"event": "done", "data": ""}
-
-        return EventSourceResponse(expired_session_generator())
+        return _make_error_stream(
+            "session_expired",
+            "Your previous session expired. Please start a new chat session.",
+        )
     except RuntimeError as e:
-        error_detail = str(e)
-        async def backend_error_generator():
-            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": error_detail})}
-            yield {"event": "done", "data": ""}
+        logger.error("Backend unavailable for stream: %s", str(e))
+        return _make_error_stream("backend_unavailable", "Service temporarily unavailable")
 
-        return EventSourceResponse(backend_error_generator())
     logger.debug("Session resolved: %s (scope=%s)", session.session_id[:12], session.active_scope)
 
     try:
         state_machine = _get_state_machine()
     except RuntimeError as e:
-        error_detail = str(e)
-        async def backend_error_generator():
-            yield {"event": "error", "data": json.dumps({"error": "backend_unavailable", "detail": error_detail})}
-            yield {"event": "done", "data": ""}
-
-        return EventSourceResponse(backend_error_generator())
+        logger.error("State machine unavailable for stream: %s", str(e))
+        return _make_error_stream("backend_unavailable", "Service temporarily unavailable")
 
     async def event_generator():
         yield {
@@ -276,9 +278,14 @@ async def chat_stream(request: ChatRequest):
                     yield {"event": evt_name, "data": payload}
                 logger.debug("Stream complete: %d events", event_count)
                 _get_session_store().save(session)
-        except Exception as e:
+        except Exception:
             logger.exception("Stream error for session=%s", session.session_id)
-            yield {"event": "error", "data": str(e)}
+            # M5 fix: Save session state on error
+            try:
+                _get_session_store().save(session)
+            except Exception:
+                logger.warning("Failed to save session on stream error")
+            yield {"event": "error", "data": json.dumps({"error": "processing_error", "message": "An error occurred"})}
 
         yield {"event": "done", "data": ""}
 
@@ -297,7 +304,8 @@ async def select_scope(request: ScopeSelectRequest) -> ScopeSelectResponse:
         _ensure_pipelines_registered()
         store = _get_session_store()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Backend unavailable for scope select: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
     session = store.get(request.session_id)
 
     if not session:
@@ -309,7 +317,8 @@ async def select_scope(request: ScopeSelectRequest) -> ScopeSelectResponse:
     try:
         state_machine = _get_state_machine()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("State machine unavailable for scope select: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     try:
         result = state_machine.select_scope(request.scope, session)
@@ -326,9 +335,9 @@ async def select_scope(request: ScopeSelectRequest) -> ScopeSelectResponse:
 
     except ScopeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except Exception:
         logger.exception("Scope selection error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred during scope selection")
 
     store.save(session)
 
@@ -352,14 +361,16 @@ async def get_scope_options(
     try:
         _ensure_pipelines_registered()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Pipeline registration failed: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     from src.session.models import create_session
 
     try:
         store = _get_session_store()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Session store unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
     session = None
 
     if session_id:
@@ -376,13 +387,14 @@ async def get_scope_options(
     try:
         state_machine = _get_state_machine()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("State machine unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     try:
         result = state_machine.get_scope_options(session)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get scope options")
-        raise HTTPException(status_code=500, detail=f"Failed to load scope options: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to load scope options")
 
     return ScopeOptionsResponse(
         options=[
@@ -411,12 +423,71 @@ async def health() -> HealthResponse:
     return HealthResponse(environment=ENVIRONMENT)
 
 
+@router.get("/health/deep")
+async def health_deep() -> dict:
+    """Deep health check for all dependencies (A1 fix).
+
+    Checks:
+      - Redis/Valkey (session store)
+      - Conversation store (SQLite/DynamoDB)
+      - Database connectivity (Aurora MySQL)
+    """
+    checks = {}
+    overall_healthy = True
+
+    # Check session store (Redis/Valkey)
+    try:
+        store = _get_session_store()
+        if hasattr(store, "_client"):
+            store._client.ping()
+            checks["session_store"] = {"status": "healthy", "backend": SESSION_BACKEND}
+        elif hasattr(store, "_store") and hasattr(store._store, "_client"):
+            store._store._client.ping()
+            checks["session_store"] = {"status": "healthy", "backend": "valkey"}
+        else:
+            checks["session_store"] = {"status": "healthy", "backend": "unknown"}
+    except Exception as e:
+        checks["session_store"] = {"status": "unhealthy", "error": str(e)}
+        overall_healthy = False
+
+    # Check conversation store
+    try:
+        conv_store = _get_conversation_store()
+        if hasattr(conv_store, "health_check"):
+            conv_store.health_check()
+        checks["conversation_store"] = {"status": "healthy"}
+    except Exception as e:
+        checks["conversation_store"] = {"status": "unhealthy", "error": str(e)}
+        overall_healthy = False
+
+    # Check database connectivity for default tenant
+    try:
+        from src.tenant.db_registry import get_connection
+        from src.tenant.tenant_router import resolve_tenant
+
+        demo_tenant = resolve_tenant("demo")
+        with get_connection(demo_tenant) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1")
+        checks["database"] = {"status": "healthy", "tenant": "demo"}
+    except Exception as e:
+        checks["database"] = {"status": "unhealthy", "error": str(e)}
+        overall_healthy = False
+
+    return {
+        "status": "healthy" if overall_healthy else "degraded",
+        "environment": ENVIRONMENT,
+        "checks": checks,
+    }
+
+
 @router.get("/session/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str) -> SessionResponse:
     try:
         store = _get_session_store()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Session store unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
     session = store.get(session_id)
 
     if not session:
@@ -441,13 +512,14 @@ async def get_history(
     try:
         conv_store = _get_conversation_store()
     except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.error("Conversation store unavailable: %s", str(e))
+        raise HTTPException(status_code=503, detail="Service temporarily unavailable")
 
     try:
         turns = conv_store.get_history(customer_key, user_id, limit=limit)
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to get history for user=%s", user_id)
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve history: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve history")
 
     return HistoryResponse(turns=turns, total=len(turns))
 
@@ -458,9 +530,9 @@ async def train() -> TrainResponse:
 
     try:
         result = await train_from_defaults_async()
-    except Exception as e:
+    except Exception:
         logger.exception("Training failed")
-        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Training failed")
 
     return TrainResponse(
         examples_trained=result.get("examples", 0),

@@ -69,6 +69,11 @@ services:
           echo "  attempt $$i — not ready yet"
           sleep 2
         done
+        # Check if table exists, create only if not
+        aws dynamodb describe-table \
+          --endpoint-url http://dynamodb-local:8000 \
+          --table-name InmateCopilot-Conversations-test >/dev/null 2>&1 && \
+          echo "Table already exists, skipping creation" && exit 0
         aws dynamodb create-table \
           --endpoint-url http://dynamodb-local:8000 \
           --table-name InmateCopilot-Conversations-test \

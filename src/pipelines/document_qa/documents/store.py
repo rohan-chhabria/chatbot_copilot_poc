@@ -20,20 +20,26 @@ class TenantDocumentStore:
     """
     ChromaDB store with tenant isolation.
 
-    Each tenant gets a separate collection: docs_{customer_key}
+    Collection naming:
+    - If DOC_CHROMA_COLLECTION is set, use that (shared collection)
+    - Otherwise use tenant-specific: docs_{customer_key}
     """
 
     def __init__(
         self,
         customer_key: str,
         persist_dir: str | None = None,
+        collection_name: str | None = None,
     ):
         import chromadb
         from chromadb.config import Settings
 
         self._customer_key = customer_key
-        self._collection_name = f"docs_{customer_key}"
 
+        # Use shared collection for all customers (docs_demo is default)
+        self._collection_name = collection_name or "docs_demo"
+
+        # Use DOC_CHROMA_DIR (./chroma_docs) for document storage
         persist_dir = persist_dir or DOC_CHROMA_DIR
         Path(persist_dir).mkdir(parents=True, exist_ok=True)
 

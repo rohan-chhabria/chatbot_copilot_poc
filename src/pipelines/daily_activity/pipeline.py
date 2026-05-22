@@ -13,11 +13,9 @@ from typing import TYPE_CHECKING, Any, AsyncGenerator
 from src.orchestrator.scope_registry import register_pipeline
 from src.pipelines.base import Pipeline
 from src.pipelines.daily_activity import activity_checker, response_formatter
-from src.pipelines.daily_activity.timetable_loader import TimetableNotFoundError
-from src.shared.config import (
-    DAILY_ACTIVITY_LOOKAHEAD_HOURS,
-    DAILY_ACTIVITY_LOOKBACK_HOURS,
-    DAILY_ACTIVITY_TOLERANCE_MINUTES,
+from src.pipelines.daily_activity.timetable_loader import (
+    TimetableNotFoundError,
+    get_activity_config,
 )
 from src.shared.logger import get_logger
 
@@ -104,10 +102,16 @@ class DailyActivityPipeline(Pipeline):
 
     async def health(self) -> dict[str, Any]:
         """Check pipeline health."""
+        # Get default config (will use env vars if no customer specified)
+        from src.shared.config import (
+            DAILY_ACTIVITY_LOOKAHEAD_HOURS,
+            DAILY_ACTIVITY_LOOKBACK_HOURS,
+        )
         return {
             "status": "healthy",
             "lookback_hours": DAILY_ACTIVITY_LOOKBACK_HOURS,
             "lookahead_hours": DAILY_ACTIVITY_LOOKAHEAD_HOURS,
+            "config_source": "env_vars_default",
         }
 
     async def _run_activity_check(self, session: Session) -> dict[str, Any]:
@@ -139,11 +143,19 @@ class DailyActivityPipeline(Pipeline):
 
         facility_names = self._get_facility_names(session)
 
+        # Get activity config from customer config (DynamoDB in production)
+        activity_config = get_activity_config(session.customer_key)
+        lookback_hours = activity_config["lookback_hours"]
+        lookahead_hours = activity_config["lookahead_hours"]
+        tolerance_minutes = activity_config["tolerance_minutes"]
+
         logger.info(
-            "Running activity check: user=%s, tenant=%s, facilities=%s",
+            "Running activity check: user=%s, tenant=%s, facilities=%s, lookback=%sh, lookahead=%sh",
             session.user_id,
             session.customer_key,
             facility_ids,
+            lookback_hours,
+            lookahead_hours,
         )
 
         try:
@@ -151,9 +163,9 @@ class DailyActivityPipeline(Pipeline):
                 tenant=tenant,
                 facility_ids=facility_ids,
                 facility_names=facility_names,
-                lookback_hours=DAILY_ACTIVITY_LOOKBACK_HOURS,
-                lookahead_hours=DAILY_ACTIVITY_LOOKAHEAD_HOURS,
-                tolerance_minutes=DAILY_ACTIVITY_TOLERANCE_MINUTES,
+                lookback_hours=lookback_hours,
+                lookahead_hours=lookahead_hours,
+                tolerance_minutes=tolerance_minutes,
             )
 
             logger.info(
@@ -166,13 +178,49 @@ class DailyActivityPipeline(Pipeline):
 
             summary = response_formatter.format_activity_response(result)
 
+            # Extract activities with IDs for API response
+            all_missed = []
+            all_upcoming = []
+            for fid, fdata in result.get("by_facility", {}).items():
+                missed_section = fdata.get("missed", {})
+                upcoming_section = fdata.get("upcoming", {})
+                for act in missed_section.get("activities", []):
+                    all_missed.append({
+                        "facility_id": int(fid),
+                        "name": act.get("name"),
+                        "start_time": act.get("start_time"),
+                        "end_time": act.get("end_time"),
+                        "keyword_id": act.get("keyword_id"),
+                        "tag_status_id": act.get("tag_status_id"),
+                        "keywords": act.get("keywords", []),
+                        "statuses": act.get("statuses", {}),
+                    })
+                for act in upcoming_section.get("activities", []):
+                    all_upcoming.append({
+                        "facility_id": int(fid),
+                        "name": act.get("name"),
+                        "start_time": act.get("start_time"),
+                        "end_time": act.get("end_time"),
+                        "keyword_id": act.get("keyword_id"),
+                        "tag_status_id": act.get("tag_status_id"),
+                        "keywords": act.get("keywords", []),
+                        "statuses": act.get("statuses", {}),
+                    })
+
             return {
                 "summary": summary,
                 "row_count": result.get("total_missed", 0) + result.get("total_upcoming", 0),
                 "total_missed": result.get("total_missed", 0),
                 "total_upcoming": result.get("total_upcoming", 0),
+                "missed_activities": all_missed,
+                "upcoming_activities": all_upcoming,
                 "by_facility": result.get("by_facility", {}),
                 "given_date_time": result.get("given_date_time"),
+                "config": {
+                    "lookback_hours": lookback_hours,
+                    "lookahead_hours": lookahead_hours,
+                    "tolerance_minutes": tolerance_minutes,
+                },
             }
 
         except TimetableNotFoundError as e:

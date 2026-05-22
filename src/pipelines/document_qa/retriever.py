@@ -34,7 +34,7 @@ class DocumentRetriever:
     Retrieves relevant document chunks via hybrid search.
 
     Combines:
-    - Semantic search (ChromaDB embeddings)
+    - Semantic search (OpenAI embeddings - 1536 dims)
     - BM25 keyword search
     - Reciprocal Rank Fusion (RRF)
     """
@@ -145,7 +145,7 @@ class DocumentRetriever:
         return final_results
 
     async def _get_embedding(self, text: str) -> list[float]:
-        """Generate embedding for text."""
+        """Generate embedding using OpenAI (1536 dims)."""
         response = await self._openai.embeddings.create(
             model=self._embedding_model,
             input=text,

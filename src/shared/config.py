@@ -61,7 +61,16 @@ _DEFAULT_TENANT_DB: dict = {
         "password": os.environ.get("MYSQL_PASSWORD", ""),
         "port": int(os.environ.get("MYSQL_PORT", "3306")),
         "default_facility_ids": [63],
-    }
+    },
+    # Customer key 14 for testing (same DB as demo)
+    "14": {
+        "host": os.environ.get("MYSQL_HOST", "localhost"),
+        "database": os.environ.get("MYSQL_DATABASE", "Demo_aurora"),
+        "user": os.environ.get("MYSQL_USER", "root"),
+        "password": os.environ.get("MYSQL_PASSWORD", ""),
+        "port": int(os.environ.get("MYSQL_PORT", "3306")),
+        "default_facility_ids": [63],
+    },
 }
 
 def _load_tenant_db_map() -> dict[str, dict[str, Any]]:

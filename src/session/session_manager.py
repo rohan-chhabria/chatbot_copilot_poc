@@ -5,11 +5,16 @@ Runtime policy:
   - prod/staging: valkey
   - local/dev: redis
 No silent runtime fallback is allowed.
+
+Features:
+  - Retry logic for transient failures (M7 fix)
+  - Configurable timeouts and retry attempts
 """
 
 from __future__ import annotations
 
 import json
+import os
 import time
 from typing import Any
 
@@ -36,6 +41,10 @@ from src.shared.config import (
 from src.shared.logger import get_logger
 
 logger = get_logger(__name__)
+
+# M7 fix: Retry configuration
+SESSION_RETRY_ATTEMPTS = int(os.environ.get("SESSION_RETRY_ATTEMPTS", "3"))
+SESSION_RETRY_DELAY = float(os.environ.get("SESSION_RETRY_DELAY", "0.5"))
 
 
 class SessionStore:
@@ -94,6 +103,7 @@ class RedisSessionStore(SessionStore):
             decode_responses=True,
             socket_connect_timeout=5,
             socket_timeout=5,
+            retry_on_timeout=True,  # M7 fix: Enable built-in retry
         )
         logger.info(
             "%s session store connected: %s:%d/%d",
@@ -103,10 +113,41 @@ class RedisSessionStore(SessionStore):
             db,
         )
 
+    def _retry_operation(self, operation, *args, **kwargs):
+        """Execute operation with retry logic (M7 fix)."""
+        import redis
+
+        last_error = None
+        for attempt in range(SESSION_RETRY_ATTEMPTS):
+            try:
+                return operation(*args, **kwargs)
+            except (redis.ConnectionError, redis.TimeoutError) as e:
+                last_error = e
+                if attempt < SESSION_RETRY_ATTEMPTS - 1:
+                    logger.warning(
+                        "%s retry %d/%d after error: %s",
+                        self._backend_label,
+                        attempt + 1,
+                        SESSION_RETRY_ATTEMPTS,
+                        str(e),
+                    )
+                    time.sleep(SESSION_RETRY_DELAY * (attempt + 1))
+        logger.error(
+            "%s operation failed after %d attempts: %s",
+            self._backend_label,
+            SESSION_RETRY_ATTEMPTS,
+            str(last_error),
+        )
+        raise last_error
+
     def get(self, session_id: str) -> Session | None:
         key = f"session:{session_id}"
         logger.debug("%s.get: %s", self._backend_label, session_id[:12])
-        data = self._client.get(key)
+
+        def _do_get():
+            return self._client.get(key)
+
+        data = self._retry_operation(_do_get)
         if not data:
             logger.debug("Session not found: %s", session_id[:12])
             return None
@@ -122,12 +163,20 @@ class RedisSessionStore(SessionStore):
             session.active_scope,
             len(session.turns),
         )
-        self._client.setex(key, SESSION_TTL_SECONDS, json.dumps(session.to_dict()))
+
+        def _do_save():
+            self._client.setex(key, SESSION_TTL_SECONDS, json.dumps(session.to_dict()))
+
+        self._retry_operation(_do_save)
 
     def delete(self, session_id: str) -> None:
         key = f"session:{session_id}"
         logger.debug("%s.delete: %s", self._backend_label, session_id[:12])
-        self._client.delete(key)
+
+        def _do_delete():
+            self._client.delete(key)
+
+        self._retry_operation(_do_delete)
 
 
 class InMemorySessionStore(SessionStore):

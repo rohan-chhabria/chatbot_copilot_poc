@@ -23,6 +23,7 @@ from src.shared.config import (
     CUSTOMER_CONFIG_TABLE,
     DAILY_ACTIVITY_LOOKAHEAD_HOURS,
     DAILY_ACTIVITY_LOOKBACK_HOURS,
+    DAILY_ACTIVITY_TOLERANCE_MINUTES,
     DOC_HYBRID_SEARCH,
     DOC_PIPELINE_TIMEOUT,
     DOC_RERANKING_ENABLED,
@@ -89,6 +90,8 @@ def _env_var_defaults(customer_key: str) -> dict[str, Any]:
         "doc_reranking_enabled": DOC_RERANKING_ENABLED,
         "daily_activity_lookback_hours": DAILY_ACTIVITY_LOOKBACK_HOURS,
         "daily_activity_lookahead_hours": DAILY_ACTIVITY_LOOKAHEAD_HOURS,
+        "daily_activity_tolerance_minutes": DAILY_ACTIVITY_TOLERANCE_MINUTES,
+        "timetables": {},  # Per-facility timetables (loaded from DynamoDB in production)
         "log_level": LOG_LEVEL,
         "allowed_origins": "*",
         "sentry_dsn": "",

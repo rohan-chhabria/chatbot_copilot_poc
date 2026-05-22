@@ -70,6 +70,9 @@ async def format_response_with_insights(
     summarizer = ResponseSummarizer()
     summary = await summarizer.summarize(insights, question)
 
+    # Include first 100 rows for API consumers
+    display_rows = filtered[:100] if len(filtered) > 100 else filtered
+
     return {
         "summary": summary,
         "row_count": len(rows),
@@ -78,6 +81,7 @@ async def format_response_with_insights(
             "type": insights.query_type,
             "red_flags": insights.red_flag_count,
         },
+        "rows": display_rows,
     }
 
 

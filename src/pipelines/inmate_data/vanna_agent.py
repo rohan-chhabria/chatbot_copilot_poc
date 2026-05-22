@@ -32,6 +32,7 @@ from src.shared.config import (
     ENABLE_GUARDRAILS,
     GEMINI_API_KEY,
     GEMINI_MODEL,
+    INMATE_PIPELINE_TIMEOUT,
     LLM_PROVIDER,
     LLM_TEMPERATURE,
     MAX_QUERY_RESULTS,
@@ -205,10 +206,28 @@ async def generate_sql_via_llm(
     question: str,
     context: str = "",
     user_id: str = "system",
+    timeout: int | None = None,
 ) -> str | None:
-    """Generate SQL from a natural language question via Vanna 2.0 LLM + memory."""
+    """Generate SQL from a natural language question via Vanna 2.0 LLM + memory.
+
+    Args:
+        question: Natural language question
+        context: Additional context for SQL generation
+        user_id: User identifier for logging
+        timeout: Request timeout in seconds (default: INMATE_PIPELINE_TIMEOUT)
+    """
     llm = get_llm_service()
-    memory_context = await _search_memory(question, user_id)
+    effective_timeout = timeout or INMATE_PIPELINE_TIMEOUT
+
+    # Memory search with timeout (M4 fix)
+    try:
+        memory_context = await asyncio.wait_for(
+            _search_memory(question, user_id),
+            timeout=effective_timeout / 2,  # Half timeout for memory search
+        )
+    except asyncio.TimeoutError:
+        logger.warning("Memory search timed out, proceeding without context")
+        memory_context = ""
 
     from vanna import LlmMessage, LlmRequest
     messages = [
@@ -222,11 +241,18 @@ async def generate_sql_via_llm(
             user=_make_user(user_id),
             temperature=LLM_TEMPERATURE,
         )
-        response = await llm.send_request(request)
+        # M4 fix: Add timeout to LLM call
+        response = await asyncio.wait_for(
+            llm.send_request(request),
+            timeout=effective_timeout,
+        )
         raw = response.content.strip() if response and response.content else None
         if raw:
             raw = _strip_markdown_fences(raw)
         return raw
+    except asyncio.TimeoutError:
+        logger.error("LLM SQL generation timed out after %ds", effective_timeout)
+        return None
     except Exception as e:
         logger.error("LLM SQL generation failed: %s", str(e))
         return None

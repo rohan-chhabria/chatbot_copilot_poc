@@ -1,56 +1,87 @@
 version = 0.1
 
+# =============================================================================
+# DEV ENVIRONMENT — Auto-deploy on push to develop branch
+# =============================================================================
 [dev.deploy.parameters]
-stack_name = "InmateCopilot-V2-dev"
-capabilities = "CAPABILITY_NAMED_IAM"
+stack_name = "InmateCopilot-dev"
+resolve_s3 = true
+s3_prefix = "inmate-copilot-sam-dev"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = false
 fail_on_empty_changeset = false
-region = "us-east-1"
 parameter_overrides = [
     "Environment=dev",
-    "DeploymentId=REPLACE_ME0",
-    "VpcId=vpc-REPLACEME",
-    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
-    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
-    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-dev:latest",
-    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-dev-XXXXXX",
+    "VpcId=vpc-0a4ecb80e63042970",
+    "PublicSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
+    "PrivateSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
+    "RedisNodeType=cache.t4g.micro",
+    "AllowedOrigins=*",
 ]
 
-[staging.deploy.parameters]
-stack_name = "InmateCopilot-V2-staging"
-capabilities = "CAPABILITY_NAMED_IAM"
-confirm_changeset = true
-fail_on_empty_changeset = false
+[dev.validate.parameters]
+template_file = "template.yaml"
 region = "us-east-1"
+
+[dev.build.parameters]
+template_file = "template.yaml"
+
+
+# =============================================================================
+# STAGING ENVIRONMENT
+# =============================================================================
+[staging.deploy.parameters]
+stack_name = "InmateCopilot-staging"
+resolve_s3 = true
+s3_prefix = "inmate-copilot-sam-staging"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
 parameter_overrides = [
     "Environment=staging",
-    "DeploymentId=REPLACE_ME0",
-    "VpcId=vpc-REPLACEME",
-    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
-    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
-    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-staging:latest",
-    "ValkeyEndpoint=VALKEY_ENDPOINT_HERE",
-    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-staging-XXXXXX",
-    "SentryDsn=YOUR_SENTRY_DSN_HERE",
+    "VpcId=vpc-REPLACE_WITH_YOUR_VPC",
+    "PublicSubnets=subnet-PUBLIC1,subnet-PUBLIC2",
+    "PrivateSubnets=subnet-PRIVATE1,subnet-PRIVATE2",
+    "RedisNodeType=cache.t4g.small",
+    "SentryDsn=YOUR_SENTRY_DSN",
     "AllowedOrigins=https://staging.yourdomain.com",
 ]
 
-[prod.deploy.parameters]
-stack_name = "InmateCopilot-V2-prod"
-capabilities = "CAPABILITY_NAMED_IAM"
-confirm_changeset = true
-fail_on_empty_changeset = false
+[staging.validate.parameters]
+template_file = "template.yaml"
 region = "us-east-1"
+
+[staging.build.parameters]
+template_file = "template.yaml"
+
+
+# =============================================================================
+# PRODUCTION ENVIRONMENT — Manual approval required in GitHub
+# =============================================================================
+[prod.deploy.parameters]
+stack_name = "InmateCopilot-prod"
+resolve_s3 = true
+s3_prefix = "inmate-copilot-sam-prod"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+confirm_changeset = false
+fail_on_empty_changeset = false
 parameter_overrides = [
     "Environment=prod",
-    "DeploymentId=REPLACE_ME0",
-    "VpcId=vpc-REPLACEME",
-    "PublicSubnets=subnet-REPLACE1,subnet-REPLACE2",
-    "PrivateSubnets=subnet-REPLACE3,subnet-REPLACE4",
-    "ContainerImage=ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot-REPLACE_ME0-prod:latest",
-    "ValkeyEndpoint=VALKEY_ENDPOINT_HERE",
-    "CertificateArn=arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID_HERE",
-    "OpenAiSecretArn=arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:InmateCopilot-prod-XXXXXX",
-    "SentryDsn=YOUR_SENTRY_DSN_HERE",
+    "VpcId=vpc-REPLACE_WITH_YOUR_VPC",
+    "PublicSubnets=subnet-PUBLIC1,subnet-PUBLIC2",
+    "PrivateSubnets=subnet-PRIVATE1,subnet-PRIVATE2",
+    "RedisNodeType=cache.t4g.medium",
+    "CertificateArn=arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT_ID",
+    "SentryDsn=YOUR_SENTRY_DSN",
     "AllowedOrigins=https://yourdomain.com",
 ]
+
+[prod.validate.parameters]
+template_file = "template.yaml"
+region = "us-east-1"
+
+[prod.build.parameters]
+template_file = "template.yaml"

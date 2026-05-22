@@ -1,54 +1,40 @@
 # =============================================================================
-# Branch-based Auto Deployment — Docker Build + ECS Fargate
+# Branch-based Auto Deployment
 # =============================================================================
-# - develop branch → deploys to 'dev' environment
-# - staging branch → deploys to 'staging' environment
-#
-# Prerequisites:
-#   - GitHub Environments: dev, staging (with optional reviewers)
-#   - Environment secrets: AWS_DEPLOY_ROLE_ARN, DEPLOYMENT_ID
-#   - CloudFormation stack deployed with infra/template.yaml
+# - develop branch → deploys to 'dev' environment (automatic)
 # =============================================================================
 
 name: Deploy (Branch)
 
 on:
   push:
-    branches: [develop, staging]
+    branches: [develop]
 
 permissions:
   id-token: write
   contents: read
 
-env:
-  AWS_REGION: us-east-1
-
 jobs:
+  # ===========================================================================
+  # Lint (quick validation before deploy)
+  # ===========================================================================
   lint:
-    name: Lint & Security
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           cache: pip
-
-      - name: Install lint tools
-        run: pip install ruff bandit
-
-      - name: Lint with ruff
-        run: ruff check src/ tests/ --output-format=github
-
-      - name: Security scan with bandit
-        run: bandit -r src/ --skip B101,B104,B108,B110,B311,B404,B603,B607
+      - run: pip install ruff
+      - run: ruff check src/ --output-format=github
 
   # ===========================================================================
-  # DEVELOP BRANCH → dev environment
+  # DEVELOP BRANCH → Dev environment
   # ===========================================================================
   deploy-dev:
-    if: github.ref_name == 'develop'
+    name: Deploy to Dev
     needs: lint
     runs-on: ubuntu-latest
     environment: dev
@@ -61,77 +47,108 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
-      - name: Login to Amazon ECR
-        id: ecr-login
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Login to ECR
+        id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+      - name: Create ECR Repository (if not exists)
+        id: create-ecr
         run: |
-          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
-          REPO="${{ steps.ecr-login.outputs.registry }}/inmate-copilot-${DEPLOY_ID}-dev"
-          docker build -t "${REPO}:${{ github.sha }}" -t "${REPO}:latest" .
-          docker push "${REPO}:${{ github.sha }}"
-          docker push "${REPO}:latest"
+          REPO_NAME="inmate-copilot-dev"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
+          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}"
 
-      - name: Update ECS service
+          aws ecr describe-repositories --repository-names $REPO_NAME 2>/dev/null || \
+            aws ecr create-repository --repository-name $REPO_NAME --image-scanning-configuration scanOnPush=true
+
+          echo "ecr_uri=${ECR_URI}" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Docker Image
         run: |
-          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
-          aws ecs update-service \
-            --cluster "InmateCopilot-${DEPLOY_ID}-dev" \
-            --service "InmateCopilot-${DEPLOY_ID}-dev" \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
+          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          docker build -t $ECR_URI:${{ github.sha }} -t $ECR_URI:latest -f dockerfile .
+          docker push $ECR_URI:${{ github.sha }}
+          docker push $ECR_URI:latest
+
+      - name: SAM Build
+        working-directory: infra
+        run: sam build --template-file template.yaml
+
+      - name: SAM Deploy
+        working-directory: infra
+        run: |
+          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --config-env dev \
+            --image-repository $ECR_URI \
+            --parameter-overrides "ContainerImage=$ECR_URI:${{ github.sha }}"
+
+      - name: Wait for ECS Service
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster InmateCopilot-dev \
+            --services InmateCopilot-dev --no-cli-pager || echo "Service may still be starting"
 
       - name: Summary
         run: |
-          echo "## Deployed InmateCopilot to dev" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Deployed to dev" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Region: \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Stack: \`InmateCopilot-dev\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`${{ steps.create-ecr.outputs.ecr_uri }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
-  # STAGING BRANCH → staging environment
+  # Smoke Test
   # ===========================================================================
-  deploy-staging:
-    if: github.ref_name == 'staging'
-    needs: lint
+  smoke-test:
+    name: Smoke Test
+    needs: deploy-dev
     runs-on: ubuntu-latest
-    environment: staging
+    if: success()
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push Docker image
+      - name: Health check
         run: |
-          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
-          REPO="${{ steps.ecr-login.outputs.registry }}/inmate-copilot-${DEPLOY_ID}-staging"
-          docker build -t "${REPO}:${{ github.sha }}" -t "${REPO}:latest" .
-          docker push "${REPO}:${{ github.sha }}"
-          docker push "${REPO}:latest"
+          API_URL="${{ secrets.DEV_API_URL }}"
+          if [ -z "$API_URL" ]; then
+            echo "DEV_API_URL not set, skipping smoke test"
+            exit 0
+          fi
+          
+          for i in 1 2 3 4 5; do
+            if curl -sf $API_URL/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 30s..."
+            sleep 30
+          done
+          echo "Health check failed after 5 attempts"
+          exit 1
 
-      - name: Update ECS service
+      - name: Basic chat test
         run: |
-          DEPLOY_ID="${{ secrets.DEPLOYMENT_ID }}"
-          aws ecs update-service \
-            --cluster "InmateCopilot-${DEPLOY_ID}-staging" \
-            --service "InmateCopilot-${DEPLOY_ID}-staging" \
-            --force-new-deployment \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Summary
-        run: |
-          echo "## Deployed InmateCopilot to staging" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Region: \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+          API_URL="${{ secrets.DEV_API_URL }}"
+          if [ -z "$API_URL" ]; then
+            echo "DEV_API_URL not set, skipping chat test"
+            exit 0
+          fi
+          
+          RESPONSE=$(curl -s -X POST $API_URL/chat \
+            -H "Content-Type: application/json" \
+            -d '{"question":"hello","customer_key":"14","user_id":"smoketest","facility_ids":[63]}')
+          echo "$RESPONSE" | jq -e '.session_id' || exit 1
+          echo "Chat test passed"

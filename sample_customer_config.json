@@ -1,0 +1,197 @@
+{
+  "_info": {
+    "description": "Sample DynamoDB Customer Configuration for InmateCopilot Chatbot",
+    "table_name": "ChatbotCustomerConfiguration",
+    "primary_key": "customer_key (String)",
+    "usage": "Copy this config, update values, and put into DynamoDB for each customer",
+    "note": "For production, db_password comes from AWS Secrets Manager; API keys stored directly in DynamoDB"
+  },
+
+  "customer_key": "14",
+  "enabled": true,
+
+  "db_host": "demo-new-db-cluster.cluster-ro-cyxsij4cwahs.us-east-1.rds.amazonaws.com",
+  "db_name": "Demo_aurora",
+  "db_user": "Demo_aurora",
+  "db_password": "N0t32023#d3m0",
+  "db_port": 3306,
+  "default_facility_ids": [63],
+
+  "llm_provider": "openai",
+  "llm_model": "gpt-4o-mini",
+  "llm_temperature": 0.1,
+  "openai_api_key": "your-openai-api-key-here",
+  "gemini_api_key": "your-gemini-api-key-here",
+  "gemini_model": "gemini-2.5-flash-lite",
+
+  "bot_name": "SARAH",
+  "bot_greeting": "Hi, I'm SARAH (Smart Access to Records, Analysis, and Help) — your personalized virtual assistant. How can I help you today?",
+
+  "max_query_results": 500,
+  "max_conversation_turns": 15,
+
+  "enable_guardrails": true,
+  "strict_tenant_validation": false,
+
+  "session_ttl_seconds": 3600,
+
+  "inmate_pipeline_timeout": 30,
+
+  "doc_pipeline_timeout": 30,
+  "doc_retrieval_top_k": 5,
+  "doc_hybrid_search": true,
+  "doc_reranking_enabled": false,
+
+  "daily_activity_lookback_hours": 8.0,
+  "daily_activity_lookahead_hours": 4.0,
+  "daily_activity_tolerance_minutes": 0,
+
+  "timetables": {
+    "63": [
+      {
+        "day": "Monday",
+        "tasks": [
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "02:45:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "04:45:00", "end_time": "05:30:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "04:45:00", "end_time": "05:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "05:00:00", "end_time": "06:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "Sanitation/Laundry Orderly report out", "keywords": "Sanitation Check |, Cell Clean Out |, Laundry |", "statuses": {"Sanitation": [], "Laundry": []}, "start_time": "05:45:00", "end_time": "06:00:00"},
+          {"task": "1st Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "07:30:00", "end_time": "09:30:00"},
+          {"task": "Gym/Yard Call", "keywords": "Recreation |", "statuses": {"Recreation": [], "Yard Call": []}, "start_time": "07:45:00", "end_time": "11:45:00"},
+          {"task": "Split shift Kitchen detail Start", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "08:00:00", "end_time": "17:00:00"},
+          {"task": "Prepare for Count", "keywords": "Census Count |", "statuses": {}, "start_time": "08:15:00", "end_time": "08:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "08:30:00", "end_time": "09:30:00"},
+          {"task": "2nd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "09:45:00", "end_time": "11:45:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "10:30:00", "end_time": "11:30:00"},
+          {"task": "2nd Shift Kitchen Detail", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "11:00:00", "end_time": "18:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "12:15:00", "end_time": "12:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "Gym/Yard Call", "keywords": "Recreation |", "statuses": {"Recreation": [], "Yard Call": []}, "start_time": "13:30:00", "end_time": "15:45:00"},
+          {"task": "3rd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "13:45:00", "end_time": "15:45:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "16:15:00", "end_time": "16:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "16:45:00", "end_time": "17:30:00"},
+          {"task": "Prepare for Count", "keywords": "Census Count |", "statuses": {}, "start_time": "18:45:00", "end_time": "19:00:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "20:45:00", "end_time": "21:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "21:00:00", "end_time": "22:00:00"},
+          {"task": "Prepare for Count", "keywords": "Official Count |", "statuses": {}, "start_time": "23:15:00", "end_time": "23:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "23:30:00", "end_time": "00:30:00"}
+        ]
+      },
+      {
+        "day": "Tuesday",
+        "tasks": [
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "04:45:00", "end_time": "05:30:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "1st Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "07:30:00", "end_time": "09:30:00"},
+          {"task": "Gym/Yard Call", "keywords": "Recreation |", "statuses": {"Recreation": [], "Yard Call": []}, "start_time": "07:45:00", "end_time": "11:45:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "08:30:00", "end_time": "09:30:00"},
+          {"task": "2nd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "09:45:00", "end_time": "11:45:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "3rd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "13:45:00", "end_time": "15:45:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "21:00:00", "end_time": "22:00:00"}
+        ]
+      },
+      {
+        "day": "Wednesday",
+        "tasks": [
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "04:45:00", "end_time": "05:30:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "1st Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "07:30:00", "end_time": "09:30:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "09:00:00", "end_time": "11:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"}
+        ]
+      },
+      {
+        "day": "Thursday",
+        "tasks": [
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Pill Call and Insulin", "keywords": "Medical |", "statuses": {"Medical": ["Pill Call PM"]}, "start_time": "04:45:00", "end_time": "05:30:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "1st Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "07:30:00", "end_time": "09:30:00"},
+          {"task": "Gym/Yard Call", "keywords": "Recreation |", "statuses": {"Recreation": [], "Yard Call": []}, "start_time": "07:45:00", "end_time": "11:45:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "08:30:00", "end_time": "09:30:00"},
+          {"task": "2nd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "09:45:00", "end_time": "11:45:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "3rd Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "13:45:00", "end_time": "15:45:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "21:00:00", "end_time": "22:00:00"}
+        ]
+      },
+      {
+        "day": "Friday",
+        "tasks": [
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "01:00:00", "end_time": "02:00:00"},
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "1st Block/Program", "keywords": "Program |", "statuses": {"Programming": []}, "start_time": "07:30:00", "end_time": "09:30:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "09:00:00", "end_time": "11:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"}
+        ]
+      },
+      {
+        "day": "Saturday",
+        "tasks": [
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "01:00:00", "end_time": "02:00:00"},
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "09:00:00", "end_time": "11:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "13:00:00", "end_time": "15:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"}
+        ]
+      },
+      {
+        "day": "Sunday",
+        "tasks": [
+          {"task": "1st Shift Kitchen Detail Report Out", "keywords": "Work Detail |", "statuses": {"Work Detail": []}, "start_time": "02:30:00", "end_time": "03:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "03:00:00", "end_time": "04:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "05:00:00", "end_time": "07:00:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "09:00:00", "end_time": "11:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "11:00:00", "end_time": "13:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "12:30:00", "end_time": "13:30:00"},
+          {"task": "Visitation", "keywords": "Visitation |", "statuses": {"Visitation": []}, "start_time": "13:00:00", "end_time": "15:00:00"},
+          {"task": "Chow Call", "keywords": "Chow Call |", "statuses": {}, "start_time": "15:00:00", "end_time": "17:30:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "16:30:00", "end_time": "17:30:00"},
+          {"task": "Count-Census", "keywords": "Census Count |", "statuses": {}, "start_time": "19:00:00", "end_time": "20:00:00"},
+          {"task": "Count-Official", "keywords": "Official Count |", "statuses": {}, "start_time": "21:00:00", "end_time": "22:00:00"}
+        ]
+      }
+    ]
+  },
+
+  "log_level": "INFO",
+  "sentry_dsn": "https://37def7386a2c71b16ce81ce32fec2939@o4510352945315840.ingest.us.sentry.io/4511429359566848",
+  "allowed_origins": "*"
+}

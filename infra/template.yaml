@@ -1,71 +1,76 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  InmateCopilot V2 — ECS Fargate deployment.
+  InmateCopilot V2 — ECS Fargate deployment with ElastiCache.
   Multi-tenant chatbot with text-to-SQL, document QA, and daily activity pipelines.
+  Push to dev/main → CI passes → Auto-deploy.
 
 Parameters:
   Environment:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
-    Description: Deployment environment.
-  DeploymentId:
-    Type: String
-    AllowedPattern: "[a-z0-9]{10}"
-    ConstraintDescription: "Must be exactly 10 lowercase alphanumeric characters."
-    Description: >
-      Unique 10-character ID per deployment.
-      Generate with: python3 -c "import uuid; print(uuid.uuid4().hex[:10])"
+    Description: Deployment environment (used for resource naming).
+
   VpcId:
     Type: AWS::EC2::VPC::Id
-    Description: VPC for ECS tasks and ALB.
+    Description: VPC for ECS tasks, ALB, and ElastiCache.
+
   PublicSubnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: Public subnets for the ALB (at least 2 AZs).
+
   PrivateSubnets:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: Private subnets for ECS tasks (at least 2 AZs).
+    Description: Private subnets for ECS tasks and ElastiCache (at least 2 AZs).
+
   ContainerImage:
     Type: String
-    Description: Full ECR image URI (e.g. 123456789.dkr.ecr.us-east-1.amazonaws.com/inmate-copilot:latest).
-  ValkeyEndpoint:
-    Type: String
     Default: ""
-    Description: ElastiCache Valkey endpoint for session storage.
+    Description: ECR image URI. Leave empty on first deploy (ECR created by stack).
+
   CertificateArn:
     Type: String
     Default: ""
-    Description: ACM certificate ARN for HTTPS. Leave empty for HTTP-only (dev).
+    Description: ACM certificate ARN for HTTPS. Leave empty for HTTP-only.
+
   SentryDsn:
     Type: String
     Default: ""
     Description: Sentry DSN for error monitoring.
+
   AllowedOrigins:
     Type: String
     Default: "*"
-    Description: CORS allowed origins. Set to frontend domain in production.
-  OpenAiSecretArn:
+    Description: CORS allowed origins.
+
+  RedisNodeType:
     Type: String
-    Description: Secrets Manager ARN containing OPENAI_API_KEY.
+    Default: cache.t4g.micro
+    AllowedValues:
+      - cache.t4g.micro
+      - cache.t4g.small
+      - cache.t4g.medium
+      - cache.r7g.large
+    Description: ElastiCache node type.
 
 Conditions:
   IsProd: !Equals [!Ref Environment, "prod"]
   HasCertificate: !Not [!Equals [!Ref CertificateArn, ""]]
-  HasValkey: !Not [!Equals [!Ref ValkeyEndpoint, ""]]
   HasSentry: !Not [!Equals [!Ref SentryDsn, ""]]
+  HasContainerImage: !Not [!Equals [!Ref ContainerImage, ""]]
 
 Resources:
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  DynamoDB Tables
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   ConversationTable:
     Type: AWS::DynamoDB::Table
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub "InmateCopilot-Conversations-${DeploymentId}-${Environment}"
+      TableName: !Sub "InmateCopilot-Conversations-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk
@@ -86,7 +91,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub "ChatbotCustomerConfiguration-${DeploymentId}-${Environment}"
+      TableName: !Sub "ChatbotCustomerConfiguration-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: customer_key
@@ -95,14 +100,14 @@ Resources:
         - AttributeName: customer_key
           KeyType: HASH
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  ECR Repository
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   EcrRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub "inmate-copilot-${DeploymentId}-${Environment}"
+      RepositoryName: !Sub "inmate-copilot-${Environment}"
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:
@@ -117,43 +122,75 @@ Resources:
                   "countType": "imageCountMoreThan",
                   "countNumber": 10
                 },
-                "action": {
-                  "type": "expire"
-                }
+                "action": { "type": "expire" }
               }
             ]
           }
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  #  ElastiCache Redis (Session Store)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnet group for InmateCopilot Redis
+      SubnetIds: !Ref PrivateSubnets
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis security group for InmateCopilot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref EcsSecurityGroup
+
+  RedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      ClusterName: !Sub "ic-redis-${Environment}"
+      Engine: redis
+      EngineVersion: "7.1"
+      CacheNodeType: !Ref RedisNodeType
+      NumCacheNodes: 1
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref RedisSecurityGroup
+      Port: 6379
+
+  # ═══════════════════════════════════════════════════════════════════════════
   #  ECS Cluster
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   EcsCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      ClusterName: !Sub "InmateCopilot-${Environment}"
       ClusterSettings:
         - Name: containerInsights
           Value: enabled
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  CloudWatch Log Group
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/ecs/inmate-copilot-${DeploymentId}-${Environment}"
+      LogGroupName: !Sub "/ecs/inmate-copilot-${Environment}"
       RetentionInDays: !If [IsProd, 90, 30]
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  IAM Roles
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "InmateCopilot-ExecRole-${DeploymentId}-${Environment}"
+      RoleName: !Sub "InmateCopilot-ExecRole-${Environment}"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -163,20 +200,11 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      Policies:
-        - PolicyName: SecretsAccess
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                Resource: !Ref OpenAiSecretArn
 
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "InmateCopilot-TaskRole-${DeploymentId}-${Environment}"
+      RoleName: !Sub "InmateCopilot-TaskRole-${Environment}"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -206,9 +234,9 @@ Resources:
                 Resource:
                   - !GetAtt CustomerConfigTable.Arn
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  Security Groups
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -236,14 +264,14 @@ Resources:
           ToPort: 8000
           SourceSecurityGroupId: !Ref AlbSecurityGroup
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  Application Load Balancer
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "IC-${DeploymentId}-${Environment}"
+      Name: !Sub "InmateCopilot-${Environment}"
       Scheme: internet-facing
       Type: application
       Subnets: !Ref PublicSubnets
@@ -256,7 +284,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub "IC-TG-${DeploymentId}-${Environment}"
+      Name: !Sub "IC-TG-${Environment}"
       Port: 8000
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -300,16 +328,17 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref TargetGroup
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  ECS Task Definition
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
+    Condition: HasContainerImage
     Properties:
-      Family: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
-      Cpu: "512"
-      Memory: "2048"
+      Family: !Sub "InmateCopilot-${Environment}"
+      Cpu: !If [IsProd, "1024", "512"]
+      Memory: !If [IsProd, "2048", "1024"]
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
@@ -325,18 +354,18 @@ Resources:
           Environment:
             - Name: ENVIRONMENT
               Value: !Ref Environment
-            - Name: DEPLOYMENT_ID
-              Value: !Ref DeploymentId
             - Name: CONVERSATION_TABLE
               Value: !Ref ConversationTable
             - Name: CUSTOMER_CONFIG_TABLE
               Value: !Ref CustomerConfigTable
-            - Name: VALKEY_HOST
-              Value: !If [HasValkey, !Ref ValkeyEndpoint, ""]
+            - Name: REDIS_HOST
+              Value: !GetAtt RedisCluster.RedisEndpoint.Address
+            - Name: REDIS_PORT
+              Value: !GetAtt RedisCluster.RedisEndpoint.Port
             - Name: SESSION_BACKEND
-              Value: auto
+              Value: redis
             - Name: LTM_BACKEND
-              Value: auto
+              Value: dynamodb
             - Name: CHROMA_STORAGE_DIR
               Value: /app/chroma_db
             - Name: DOC_CHROMA_DIR
@@ -346,14 +375,11 @@ Resources:
             - Name: LOG_LEVEL
               Value: !If [IsProd, "WARNING", "INFO"]
             - Name: STRICT_TENANT_VALIDATION
-              Value: !If [IsProd, "true", "false"]
+              Value: "false"
             - Name: SENTRY_DSN
               Value: !If [HasSentry, !Ref SentryDsn, ""]
             - Name: ALLOWED_ORIGINS
               Value: !Ref AllowedOrigins
-          Secrets:
-            - Name: OPENAI_API_KEY
-              ValueFrom: !Ref OpenAiSecretArn
           HealthCheck:
             Command:
               - CMD-SHELL
@@ -369,22 +395,23 @@ Resources:
               awslogs-region: !Ref "AWS::Region"
               awslogs-stream-prefix: ecs
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  ECS Service
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   EcsService:
     Type: AWS::ECS::Service
+    Condition: HasContainerImage
     DependsOn: HttpListener
     Properties:
-      ServiceName: !Sub "InmateCopilot-${DeploymentId}-${Environment}"
+      ServiceName: !Sub "InmateCopilot-${Environment}"
       Cluster: !Ref EcsCluster
       TaskDefinition: !Ref TaskDefinition
-      DesiredCount: !If [IsProd, 3, 1]
+      DesiredCount: !If [IsProd, 2, 1]
       LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
+          AssignPublicIp: ENABLED
           Subnets: !Ref PrivateSubnets
           SecurityGroups:
             - !Ref EcsSecurityGroup
@@ -397,22 +424,24 @@ Resources:
         MaximumPercent: 200
       HealthCheckGracePeriodSeconds: 120
 
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  Auto Scaling
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
 
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Condition: HasContainerImage
     Properties:
       ServiceNamespace: ecs
       ScalableDimension: ecs:service:DesiredCount
       ResourceId: !Sub "service/${EcsCluster}/${EcsService.Name}"
-      MinCapacity: !If [IsProd, 3, 1]
-      MaxCapacity: !If [IsProd, 15, 3]
+      MinCapacity: !If [IsProd, 2, 1]
+      MaxCapacity: !If [IsProd, 10, 3]
       RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
 
   CpuScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Condition: HasContainerImage
     Properties:
       PolicyName: !Sub "InmateCopilot-CPU-${Environment}"
       PolicyType: TargetTrackingScaling
@@ -424,66 +453,15 @@ Resources:
         ScaleOutCooldown: 60
         ScaleInCooldown: 300
 
-  MemoryScalingPolicy:
-    Type: AWS::ApplicationAutoScaling::ScalingPolicy
-    Properties:
-      PolicyName: !Sub "InmateCopilot-Memory-${Environment}"
-      PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ScalableTarget
-      TargetTrackingScalingPolicyConfiguration:
-        PredefinedMetricSpecification:
-          PredefinedMetricType: ECSServiceAverageMemoryUtilization
-        TargetValue: 70
-        ScaleOutCooldown: 60
-        ScaleInCooldown: 300
-
-  # ─────────────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
   #  CloudWatch Alarms
-  # ─────────────────────────────────────────────────────────────────────────
-
-  CpuAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub "InmateCopilot-CPU-High-${Environment}"
-      AlarmDescription: ECS service CPU utilization above 80% for 5 minutes.
-      Namespace: AWS/ECS
-      MetricName: CPUUtilization
-      Dimensions:
-        - Name: ClusterName
-          Value: !Ref EcsCluster
-        - Name: ServiceName
-          Value: !GetAtt EcsService.Name
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 80
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-
-  MemoryAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub "InmateCopilot-Memory-High-${Environment}"
-      AlarmDescription: ECS service memory utilization above 85% for 5 minutes.
-      Namespace: AWS/ECS
-      MetricName: MemoryUtilization
-      Dimensions:
-        - Name: ClusterName
-          Value: !Ref EcsCluster
-        - Name: ServiceName
-          Value: !GetAtt EcsService.Name
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 85
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
+  # ═══════════════════════════════════════════════════════════════════════════
 
   Alb5xxAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub "InmateCopilot-ALB-5xx-${Environment}"
-      AlarmDescription: ALB returning more than 5% error rate.
+      AlarmDescription: ALB returning errors
       Namespace: AWS/ApplicationELB
       MetricName: HTTPCode_Target_5XX_Count
       Dimensions:
@@ -496,59 +474,35 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
-  UnhealthyTargetsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub "InmateCopilot-UnhealthyTargets-${Environment}"
-      AlarmDescription: ALB target group has unhealthy targets.
-      Namespace: AWS/ApplicationELB
-      MetricName: UnHealthyHostCount
-      Dimensions:
-        - Name: TargetGroup
-          Value: !GetAtt TargetGroup.TargetGroupFullName
-        - Name: LoadBalancer
-          Value: !GetAtt ApplicationLoadBalancer.LoadBalancerFullName
-      Statistic: Maximum
-      Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-
-  ConversationThrottleAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub "InmateCopilot-Conversations-Throttles-${Environment}"
-      AlarmDescription: DynamoDB throttling on Conversation table.
-      Namespace: AWS/DynamoDB
-      MetricName: ThrottledRequests
-      Dimensions:
-        - Name: TableName
-          Value: !Ref ConversationTable
-      Statistic: Sum
-      Period: 300
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-
 Outputs:
-  AlbDnsName:
-    Description: ALB DNS name (use for Route 53 or direct access)
-    Value: !GetAtt ApplicationLoadBalancer.DNSName
-  AlbUrl:
-    Description: ALB URL
+  ApiUrl:
+    Description: API endpoint URL (use this to access the chatbot)
     Value: !If
       - HasCertificate
       - !Sub "https://${ApplicationLoadBalancer.DNSName}"
       - !Sub "http://${ApplicationLoadBalancer.DNSName}"
-  EcsClusterName:
-    Value: !Ref EcsCluster
-  EcsServiceName:
-    Value: !GetAtt EcsService.Name
-  ConversationTableName:
-    Value: !Ref ConversationTable
-  CustomerConfigTableName:
-    Value: !Ref CustomerConfigTable
+
   EcrRepositoryUri:
+    Description: ECR repository URI (push Docker images here)
     Value: !GetAtt EcrRepository.RepositoryUri
+
+  RedisEndpoint:
+    Description: Redis endpoint for session storage
+    Value: !Sub "${RedisCluster.RedisEndpoint.Address}:${RedisCluster.RedisEndpoint.Port}"
+
+  ConversationTableName:
+    Description: DynamoDB table for conversation history
+    Value: !Ref ConversationTable
+
+  CustomerConfigTableName:
+    Description: DynamoDB table for customer configuration
+    Value: !Ref CustomerConfigTable
+
+  EcsClusterName:
+    Description: ECS cluster name
+    Value: !Ref EcsCluster
+
+  EcsServiceName:
+    Description: ECS service name
+    Condition: HasContainerImage
+    Value: !GetAtt EcsService.Name

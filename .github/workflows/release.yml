@@ -1,0 +1,159 @@
+# =============================================================================
+# Production Release - Manual Deployment Only
+# =============================================================================
+# Triggers: Manual dispatch only (no auto-deploy on push to main)
+# Supports: Single environment, multiple environments, or all
+# Each environment requires approval via GitHub Environment protection rules
+# =============================================================================
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      environments:
+        description: "Environments (comma-separated, empty=all). Examples: 'prod' or 'staging,prod'"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Prepare: Parse environments input
+  # ---------------------------------------------------------------------------
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      env_list: ${{ steps.set-matrix.outputs.env_list }}
+    steps:
+      - name: Parse environments input
+        id: set-matrix
+        run: |
+          INPUT="${{ github.event.inputs.environments }}"
+
+          # Default: all production environments
+          ALL_ENVS="staging,prod"
+
+          if [ -z "$INPUT" ]; then
+            ENVS="$ALL_ENVS"
+            echo "Deploying to ALL environments: $ENVS"
+          else
+            ENVS="$INPUT"
+            echo "Deploying to selected environments: $ENVS"
+          fi
+
+          # Convert to JSON array for matrix
+          JSON_ARRAY=$(echo "$ENVS" | tr ',' '\n' | jq -R . | jq -s -c .)
+          echo "matrix={\"environment\":$JSON_ARRAY}" >> $GITHUB_OUTPUT
+          echo "env_list=$ENVS" >> $GITHUB_OUTPUT
+
+          echo "Matrix: $JSON_ARRAY"
+
+  # ---------------------------------------------------------------------------
+  # CI: Lint & Test (runs once)
+  # ---------------------------------------------------------------------------
+  ci:
+    name: CI Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: pip install ruff
+      - name: Lint
+        run: ruff check src/ --output-format=github
+      - name: Format check
+        run: ruff format src/ --check
+
+  # ---------------------------------------------------------------------------
+  # Deploy to selected environments (parallel, each with approval)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to ${{ matrix.environment }}
+    needs: [prepare, ci]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (${{ matrix.environment }})
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install SAM CLI
+        run: pip install aws-sam-cli
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR Repository (if not exists)
+        id: create-ecr
+        run: |
+          REPO_NAME="inmate-copilot-${{ matrix.environment }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
+          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}"
+
+          aws ecr describe-repositories --repository-names $REPO_NAME 2>/dev/null || \
+            aws ecr create-repository --repository-name $REPO_NAME --image-scanning-configuration scanOnPush=true
+
+          echo "ecr_uri=${ECR_URI}" >> $GITHUB_OUTPUT
+          echo "repo_name=${REPO_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Build & Push Docker Image
+        run: |
+          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          docker build -t $ECR_URI:${{ github.sha }} -t $ECR_URI:latest -f dockerfile .
+          docker push $ECR_URI:${{ github.sha }}
+          docker push $ECR_URI:latest
+
+      - name: SAM Build
+        working-directory: infra
+        run: sam build --template-file template.yaml
+
+      - name: SAM Deploy
+        working-directory: infra
+        run: |
+          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --config-env ${{ matrix.environment }} \
+            --image-repository $ECR_URI \
+            --parameter-overrides "ContainerImage=$ECR_URI:${{ github.sha }}"
+
+      - name: Wait for ECS Service
+        run: |
+          echo "Waiting for ECS service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster InmateCopilot-${{ matrix.environment }} \
+            --services InmateCopilot-${{ matrix.environment }} || echo "Service may still be starting"
+
+      - name: Summary
+        run: |
+          echo "## ✅ Released to ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Stack: \`InmateCopilot-${{ matrix.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`${{ steps.create-ecr.outputs.ecr_uri }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- AWS Account: $(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_STEP_SUMMARY

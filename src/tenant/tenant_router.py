@@ -3,6 +3,10 @@ Tenant Router — Routes customer_key to the correct database connection.
 
 Single deployment serves all tenants. The customer_key (from request header
 or auth token) determines which Aurora MySQL endpoint is used.
+
+Priority:
+1. DynamoDB customer config (ChatbotCustomerConfiguration table)
+2. Environment variable TENANT_DB_MAP (backward compatible)
 """
 
 from __future__ import annotations
@@ -11,6 +15,7 @@ from dataclasses import dataclass
 
 from src.shared.config import STRICT_TENANT_VALIDATION, TENANT_DB_MAP, is_valid_tenant
 from src.shared.logger import get_logger
+from src.tenant.customer_config import get_customer_config
 
 logger = get_logger(__name__)
 
@@ -39,14 +44,32 @@ def resolve_tenant(customer_key: str) -> TenantContext:
         logger.warning("Unknown tenant rejected: %s", normalized)
         raise TenantNotFoundError(f"Unknown tenant: {normalized}")
 
+    # First try to get config from DynamoDB
+    config = get_customer_config(normalized)
+
+    if config.get("_source") == "dynamodb" and config.get("db_host"):
+        logger.debug("Using DynamoDB config for tenant=%s host=%s", normalized, config.get("db_host"))
+        return TenantContext(
+            customer_key=normalized,
+            db_host=config["db_host"],
+            db_name=config.get("db_name", ""),
+            db_user=config.get("db_user", ""),
+            db_password=config.get("db_password", ""),
+            db_port=int(config.get("db_port", 3306)),
+        )
+
+    # Fallback to TENANT_DB_MAP from environment variables
     db_config = TENANT_DB_MAP.get(normalized)
     if not db_config:
         if STRICT_TENANT_VALIDATION:
             raise TenantNotFoundError(f"No DB config for tenant: {normalized}")
 
-        logger.info("Using default DB config for unregistered tenant: %s", normalized)
-        default_key = next(iter(TENANT_DB_MAP))
-        db_config = TENANT_DB_MAP[default_key]
+        if TENANT_DB_MAP:
+            logger.info("Using default DB config for unregistered tenant: %s", normalized)
+            default_key = next(iter(TENANT_DB_MAP))
+            db_config = TENANT_DB_MAP[default_key]
+        else:
+            raise TenantNotFoundError(f"No DB config available for tenant: {normalized}")
 
     return TenantContext(
         customer_key=normalized,

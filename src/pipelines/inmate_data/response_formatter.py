@@ -38,6 +38,7 @@ async def format_response_with_insights(
     rows: list[dict[str, Any]],
     question: str,
     sql: str,
+    customer_key: str | None = None,
 ) -> dict[str, Any]:
     """
     Format response using insight extraction + LLM summarization.
@@ -67,7 +68,7 @@ async def format_response_with_insights(
     )
 
     # Generate summary
-    summarizer = ResponseSummarizer()
+    summarizer = ResponseSummarizer(customer_key=customer_key)
     summary = await summarizer.summarize(insights, question)
 
     # Include first 100 rows for API consumers
@@ -89,6 +90,7 @@ async def format_response_stream(
     rows: list[dict[str, Any]],
     question: str,
     sql: str,
+    customer_key: str | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream response generation for SSE.
@@ -115,7 +117,7 @@ async def format_response_stream(
     yield {"event": "status", "data": "Generating summary..."}
 
     # Stream the summary
-    summarizer = ResponseSummarizer()
+    summarizer = ResponseSummarizer(customer_key=customer_key)
     full_summary = ""
 
     async for token in summarizer.summarize_stream(insights, question):

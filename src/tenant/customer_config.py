@@ -12,6 +12,7 @@ the existing env-var-based configuration in shared/config.py.
 from __future__ import annotations
 
 import threading
+from decimal import Decimal
 from typing import Any
 
 import boto3
@@ -50,6 +51,19 @@ logger = get_logger(__name__)
 _lock = threading.Lock()
 _cache: dict[str, dict[str, Any]] = {}
 _dynamo_table = None
+
+
+def _convert_decimals(obj: Any) -> Any:
+    """Convert DynamoDB Decimal types to native Python types (float/int)."""
+    if isinstance(obj, Decimal):
+        if obj % 1 == 0:
+            return int(obj)
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: _convert_decimals(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_convert_decimals(i) for i in obj]
+    return obj
 
 
 def _get_table():
@@ -111,6 +125,7 @@ def _fetch_from_dynamo(customer_key: str) -> dict[str, Any] | None:
         response = table.get_item(Key={"customer_key": customer_key})
         item = response.get("Item")
         if item:
+            item = _convert_decimals(item)
             item["_source"] = "dynamodb"
             logger.info(
                 "Loaded config from DynamoDB for customer=%s",

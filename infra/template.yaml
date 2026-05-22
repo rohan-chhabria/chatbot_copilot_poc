@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  InmateCopilot V2 — ECS Fargate deployment with ElastiCache.
+  SARAH-ChatBot — ECS Fargate deployment with Valkey (ElastiCache).
   Multi-tenant chatbot with text-to-SQL, document QA, and daily activity pipelines.
-  Push to dev/main → CI passes → Auto-deploy.
+  Push to develop → auto-deploy to dev. Push to staging → auto-deploy to staging.
 
 Parameters:
   Environment:
@@ -43,7 +43,7 @@ Parameters:
     Default: "*"
     Description: CORS allowed origins.
 
-  RedisNodeType:
+  ValkeyNodeType:
     Type: String
     Default: cache.t4g.micro
     AllowedValues:
@@ -51,7 +51,7 @@ Parameters:
       - cache.t4g.small
       - cache.t4g.medium
       - cache.r7g.large
-    Description: ElastiCache node type.
+    Description: Valkey (ElastiCache) node type.
 
 Conditions:
   IsProd: !Equals [!Ref Environment, "prod"]
@@ -70,7 +70,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: !Sub "InmateCopilot-Conversations-${Environment}"
+      TableName: !Sub "SARAH-ChatBot-Conversations-${Environment}"
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk
@@ -107,7 +107,7 @@ Resources:
   EcrRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub "inmate-copilot-${Environment}"
+      RepositoryName: !Sub "sarah-chatbot-${Environment}"
       ImageScanningConfiguration:
         ScanOnPush: true
       LifecyclePolicy:
@@ -128,19 +128,19 @@ Resources:
           }
 
   # ═══════════════════════════════════════════════════════════════════════════
-  #  ElastiCache Redis (Session Store)
+  #  ElastiCache Valkey (Session Store)
   # ═══════════════════════════════════════════════════════════════════════════
 
-  RedisSubnetGroup:
+  ValkeySubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
     Properties:
-      Description: Subnet group for InmateCopilot Redis
+      Description: Subnet group for SARAH-ChatBot Valkey
       SubnetIds: !Ref PrivateSubnets
 
-  RedisSecurityGroup:
+  ValkeySecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Redis security group for InmateCopilot
+      GroupDescription: Valkey security group for SARAH-ChatBot
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -148,17 +148,22 @@ Resources:
           ToPort: 6379
           SourceSecurityGroupId: !Ref EcsSecurityGroup
 
-  RedisCluster:
-    Type: AWS::ElastiCache::CacheCluster
+  ValkeyReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
     Properties:
-      ClusterName: !Sub "ic-redis-${Environment}"
-      Engine: redis
-      EngineVersion: "7.1"
-      CacheNodeType: !Ref RedisNodeType
-      NumCacheNodes: 1
-      CacheSubnetGroupName: !Ref RedisSubnetGroup
-      VpcSecurityGroupIds:
-        - !Ref RedisSecurityGroup
+      ReplicationGroupId: !Sub "sarah-valkey-${Environment}"
+      ReplicationGroupDescription: !Sub "SARAH-ChatBot Valkey for ${Environment}"
+      Engine: valkey
+      EngineVersion: "8.0"
+      CacheNodeType: !Ref ValkeyNodeType
+      NumNodeGroups: 1
+      ReplicasPerNodeGroup: 0
+      AutomaticFailoverEnabled: false
+      TransitEncryptionEnabled: false
+      AtRestEncryptionEnabled: false
+      CacheSubnetGroupName: !Ref ValkeySubnetGroup
+      SecurityGroupIds:
+        - !Ref ValkeySecurityGroup
       Port: 6379
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -168,7 +173,7 @@ Resources:
   EcsCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub "InmateCopilot-${Environment}"
+      ClusterName: !Sub "SARAH-ChatBot-${Environment}"
       ClusterSettings:
         - Name: containerInsights
           Value: enabled
@@ -180,7 +185,7 @@ Resources:
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/ecs/inmate-copilot-${Environment}"
+      LogGroupName: !Sub "/ecs/sarah-chatbot-${Environment}"
       RetentionInDays: !If [IsProd, 90, 30]
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -190,7 +195,7 @@ Resources:
   TaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "InmateCopilot-ExecRole-${Environment}"
+      RoleName: !Sub "SARAH-ChatBot-ExecRole-${Environment}"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -204,7 +209,7 @@ Resources:
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub "InmateCopilot-TaskRole-${Environment}"
+      RoleName: !Sub "SARAH-ChatBot-TaskRole-${Environment}"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -225,12 +230,15 @@ Resources:
                   - dynamodb:DeleteItem
                   - dynamodb:Query
                   - dynamodb:BatchWriteItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:Scan
                 Resource:
                   - !GetAtt ConversationTable.Arn
                   - !Sub "${ConversationTable.Arn}/index/*"
               - Effect: Allow
                 Action:
                   - dynamodb:GetItem
+                  - dynamodb:DescribeTable
                 Resource:
                   - !GetAtt CustomerConfigTable.Arn
 
@@ -241,7 +249,7 @@ Resources:
   AlbSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: ALB security group for InmateCopilot
+      GroupDescription: ALB security group for SARAH-ChatBot
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -256,7 +264,7 @@ Resources:
   EcsSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: ECS tasks security group for InmateCopilot
+      GroupDescription: ECS tasks security group for SARAH-ChatBot
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -271,7 +279,7 @@ Resources:
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      Name: !Sub "InmateCopilot-${Environment}"
+      Name: !Sub "SARAH-ChatBot-${Environment}"
       Scheme: internet-facing
       Type: application
       Subnets: !Ref PublicSubnets
@@ -284,7 +292,7 @@ Resources:
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub "IC-TG-${Environment}"
+      Name: !Sub "SARAH-TG-${Environment}"
       Port: 8000
       Protocol: HTTP
       VpcId: !Ref VpcId
@@ -336,7 +344,7 @@ Resources:
     Type: AWS::ECS::TaskDefinition
     Condition: HasContainerImage
     Properties:
-      Family: !Sub "InmateCopilot-${Environment}"
+      Family: !Sub "SARAH-ChatBot-${Environment}"
       Cpu: !If [IsProd, "1024", "512"]
       Memory: !If [IsProd, "2048", "1024"]
       NetworkMode: awsvpc
@@ -345,7 +353,7 @@ Resources:
       ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
       TaskRoleArn: !GetAtt TaskRole.Arn
       ContainerDefinitions:
-        - Name: inmate-copilot
+        - Name: sarah-chatbot
           Image: !Ref ContainerImage
           Essential: true
           PortMappings:
@@ -359,9 +367,9 @@ Resources:
             - Name: CUSTOMER_CONFIG_TABLE
               Value: !Ref CustomerConfigTable
             - Name: REDIS_HOST
-              Value: !GetAtt RedisCluster.RedisEndpoint.Address
+              Value: !GetAtt ValkeyReplicationGroup.PrimaryEndPoint.Address
             - Name: REDIS_PORT
-              Value: !GetAtt RedisCluster.RedisEndpoint.Port
+              Value: !GetAtt ValkeyReplicationGroup.PrimaryEndPoint.Port
             - Name: SESSION_BACKEND
               Value: redis
             - Name: LTM_BACKEND
@@ -404,7 +412,7 @@ Resources:
     Condition: HasContainerImage
     DependsOn: HttpListener
     Properties:
-      ServiceName: !Sub "InmateCopilot-${Environment}"
+      ServiceName: !Sub "SARAH-ChatBot-${Environment}"
       Cluster: !Ref EcsCluster
       TaskDefinition: !Ref TaskDefinition
       DesiredCount: !If [IsProd, 2, 1]
@@ -416,7 +424,7 @@ Resources:
           SecurityGroups:
             - !Ref EcsSecurityGroup
       LoadBalancers:
-        - ContainerName: inmate-copilot
+        - ContainerName: sarah-chatbot
           ContainerPort: 8000
           TargetGroupArn: !Ref TargetGroup
       DeploymentConfiguration:
@@ -443,7 +451,7 @@ Resources:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Condition: HasContainerImage
     Properties:
-      PolicyName: !Sub "InmateCopilot-CPU-${Environment}"
+      PolicyName: !Sub "SARAH-ChatBot-CPU-${Environment}"
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ScalableTarget
       TargetTrackingScalingPolicyConfiguration:
@@ -460,7 +468,7 @@ Resources:
   Alb5xxAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: !Sub "InmateCopilot-ALB-5xx-${Environment}"
+      AlarmName: !Sub "SARAH-ChatBot-ALB-5xx-${Environment}"
       AlarmDescription: ALB returning errors
       Namespace: AWS/ApplicationELB
       MetricName: HTTPCode_Target_5XX_Count
@@ -486,9 +494,9 @@ Outputs:
     Description: ECR repository URI (push Docker images here)
     Value: !GetAtt EcrRepository.RepositoryUri
 
-  RedisEndpoint:
-    Description: Redis endpoint for session storage
-    Value: !Sub "${RedisCluster.RedisEndpoint.Address}:${RedisCluster.RedisEndpoint.Port}"
+  ValkeyEndpoint:
+    Description: Valkey endpoint for session storage
+    Value: !Sub "${ValkeyReplicationGroup.PrimaryEndPoint.Address}:${ValkeyReplicationGroup.PrimaryEndPoint.Port}"
 
   ConversationTableName:
     Description: DynamoDB table for conversation history

@@ -21,6 +21,7 @@ from src.shared.config import (
     OPENAI_API_KEY,
 )
 from src.shared.logger import get_logger
+from src.tenant.customer_config import get_customer_config
 
 if TYPE_CHECKING:
     from src.pipelines.document_qa.documents.store import TenantDocumentStore
@@ -39,8 +40,10 @@ class DocumentRetriever:
     - Reciprocal Rank Fusion (RRF)
     """
 
-    def __init__(self):
-        self._openai = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    def __init__(self, customer_key: str | None = None):
+        config = get_customer_config(customer_key) if customer_key else {}
+        api_key = config.get("openai_api_key") or OPENAI_API_KEY
+        self._openai = AsyncOpenAI(api_key=api_key)
         self._embedding_model = DOC_EMBEDDING_MODEL
         self._bm25_indices: dict[str, Any] = {}
         self._bm25_docs: dict[str, list[dict]] = {}

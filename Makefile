@@ -1,5 +1,5 @@
 # =============================================================================
-# InmateCopilot — Master Makefile
+# SARAH-ChatBot — Master Makefile
 # =============================================================================
 #
 # USAGE:
@@ -8,7 +8,7 @@
 # EXAMPLES:
 #   make install                      # Install all dependencies
 #   make run                          # Run locally with uvicorn
-#   make test                         # Run unit tests
+#   make test-ui                      # Open test UI in browser
 #   make deploy ENVIRONMENT=staging   # Deploy to staging
 #   make rollback ENVIRONMENT=prod TAG=abc123  # Rollback production
 #
@@ -29,17 +29,17 @@ AWS_REGION ?= us-east-1
 ENVIRONMENT ?= dev
 
 # ECR_REPO: ECR repository name (auto-generated from environment)
-ECR_REPO ?= inmate-copilot-$(ENVIRONMENT)
+ECR_REPO ?= sarah-chatbot-$(ENVIRONMENT)
 
 # IMAGE_TAG: Docker image tag (use 'latest' for dev, git SHA for production)
 IMAGE_TAG ?= latest
 
 # SAM_STACK_NAME: CloudFormation stack name (auto-generated)
-SAM_STACK_NAME ?= InmateCopilot-$(ENVIRONMENT)
+SAM_STACK_NAME ?= SARAH-ChatBot-$(ENVIRONMENT)
 
 # DYNAMO_TABLE: DynamoDB table for customer config (auto-generated)
 DYNAMO_CONFIG_TABLE ?= ChatbotCustomerConfiguration-$(ENVIRONMENT)
-DYNAMO_CONV_TABLE ?= InmateCopilot-Conversations-$(ENVIRONMENT)
+DYNAMO_CONV_TABLE ?= SARAH-ChatBot-Conversations-$(ENVIRONMENT)
 
 # PYTHON: Python interpreter path
 PYTHON ?= python3
@@ -55,7 +55,7 @@ PYTEST_ARGS ?= -v --tb=short
 help: ## Show this help with all available commands
 	@echo ""
 	@echo "╔══════════════════════════════════════════════════════════════════════╗"
-	@echo "║                  InmateCopilot — Makefile Commands                   ║"
+	@echo "║                  SARAH-ChatBot — Makefile Commands                   ║"
 	@echo "╚══════════════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "CURRENT SETTINGS:"
@@ -72,6 +72,7 @@ help: ## Show this help with all available commands
 	@echo "EXAMPLES:"
 	@echo "  make install                           # Install dependencies"
 	@echo "  make run                               # Start local server"
+	@echo "  make test-ui                           # Open test console"
 	@echo "  make test PYTEST_ARGS=\"-k inmate\"      # Run inmate-related tests"
 	@echo "  make deploy ENVIRONMENT=staging        # Deploy to staging"
 	@echo "  make rollback ENVIRONMENT=prod TAG=abc123"
@@ -100,11 +101,29 @@ install-dev: install ## Install Python dependencies (dev + prod)
 run: ## Run FastAPI locally with uvicorn (hot-reload enabled)
 	@echo "╔══════════════════════════════════════════════════════════════════════╗"
 	@echo "║ Starting local development server...                                 ║"
-	@echo "║ URL: http://localhost:8000                                           ║"
-	@echo "║ Docs: http://localhost:8000/docs                                     ║"
+	@echo "║ URL: http://localhost:8065                                           ║"
+	@echo "║ Docs: http://localhost:8065/docs                                     ║"
 	@echo "║ Press Ctrl+C to stop                                                 ║"
 	@echo "╚══════════════════════════════════════════════════════════════════════╝"
 	$(PYTHON) -m local.server
+
+.PHONY: test-ui
+test-ui: ## Open test UI in browser (works with local or deployed backends)
+	@echo "╔══════════════════════════════════════════════════════════════════════╗"
+	@echo "║ Opening Test Console...                                              ║"
+	@echo "║                                                                      ║"
+	@echo "║ The test UI can connect to:                                          ║"
+	@echo "║   - Local: http://localhost:8065 (run 'make run' first)              ║"
+	@echo "║   - Dev:   AWS dev environment                                       ║"
+	@echo "║   - Custom: Any URL you specify                                      ║"
+	@echo "╚══════════════════════════════════════════════════════════════════════╝"
+	@if command -v xdg-open > /dev/null; then \
+		xdg-open local/test-ui.html; \
+	elif command -v open > /dev/null; then \
+		open local/test-ui.html; \
+	else \
+		echo "Open local/test-ui.html in your browser"; \
+	fi
 
 .PHONY: test
 test: ## Run all tests
@@ -304,9 +323,15 @@ load-config: ## Load customer config from sample_customer_config.json to DynamoD
 	@echo "╚══════════════════════════════════════════════════════════════════════╝"
 	@$(PYTHON) -c "\
 import json, boto3; \
+from decimal import Decimal; \
+def convert(item): \
+    if isinstance(item, float): return Decimal(str(item)); \
+    if isinstance(item, dict): return {k: convert(v) for k, v in item.items()}; \
+    if isinstance(item, list): return [convert(i) for i in item]; \
+    return item; \
 config = json.load(open('sample_customer_config.json')); \
 config.pop('_info', None); \
-boto3.resource('dynamodb', region_name='$(AWS_REGION)').Table('$(DYNAMO_CONFIG_TABLE)').put_item(Item=config); \
+boto3.resource('dynamodb', region_name='$(AWS_REGION)').Table('$(DYNAMO_CONFIG_TABLE)').put_item(Item=convert(config)); \
 print('✅ Loaded config for customer_key:', config['customer_key'])"
 
 .PHONY: list-customers
@@ -370,10 +395,10 @@ enable-customer: ## Enable a customer (requires CUSTOMER_KEY=xxx)
 
 .PHONY: logs
 logs: ## Tail ECS logs in real-time (requires ENVIRONMENT)
-	@echo "Tailing logs for: /ecs/inmate-copilot-$(ENVIRONMENT)"
+	@echo "Tailing logs for: /ecs/sarah-chatbot-$(ENVIRONMENT)"
 	@echo "Press Ctrl+C to stop"
 	@echo ""
-	aws logs tail /ecs/inmate-copilot-$(ENVIRONMENT) --follow --region $(AWS_REGION)
+	aws logs tail /ecs/sarah-chatbot-$(ENVIRONMENT) --follow --region $(AWS_REGION)
 
 .PHONY: stack-status
 stack-status: ## Show CloudFormation stack status

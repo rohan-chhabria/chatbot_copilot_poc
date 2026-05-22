@@ -1,0 +1,93 @@
+{
+  "_info": "Stack configurations for testing against different environments",
+  
+  "stacks": {
+    "local": {
+      "name": "Local Development",
+      "api_url": "http://localhost:8065",
+      "description": "Local server with fakeredis/sqlite",
+      "customer_key": "demo",
+      "is_default": true
+    },
+    "dev": {
+      "name": "AWS Dev",
+      "api_url": "http://SARAH-ChatBot-dev-257557694.us-east-1.elb.amazonaws.com",
+      "description": "Development environment on AWS",
+      "customer_key": "14",
+      "is_default": false
+    },
+    "staging": {
+      "name": "AWS Staging",
+      "api_url": "",
+      "description": "Staging environment (configure after deployment)",
+      "customer_key": "14",
+      "is_default": false
+    },
+    "prod": {
+      "name": "AWS Production",
+      "api_url": "",
+      "description": "Production environment (configure after deployment)",
+      "customer_key": "14",
+      "is_default": false
+    }
+  },
+
+  "test_users": {
+    "local": [
+      {
+        "user_id": "Richard.Bell",
+        "display_name": "Richard Bell",
+        "customer_key": "demo",
+        "role": "officer",
+        "facility_ids": [63],
+        "avatar": "RB"
+      },
+      {
+        "user_id": "Mark.Kent",
+        "display_name": "Mark Kent",
+        "customer_key": "demo",
+        "role": "warden",
+        "facility_ids": [63, 164, 182],
+        "avatar": "MK"
+      }
+    ],
+    "dev": [
+      {
+        "user_id": "test.officer",
+        "display_name": "Test Officer",
+        "customer_key": "14",
+        "role": "officer",
+        "facility_ids": [63],
+        "avatar": "TO"
+      },
+      {
+        "user_id": "test.warden",
+        "display_name": "Test Warden",
+        "customer_key": "14",
+        "role": "warden",
+        "facility_ids": [63],
+        "avatar": "TW"
+      }
+    ],
+    "staging": [
+      {
+        "user_id": "qa.tester",
+        "display_name": "QA Tester",
+        "customer_key": "14",
+        "role": "officer",
+        "facility_ids": [63],
+        "avatar": "QA"
+      }
+    ],
+    "prod": [
+      {
+        "user_id": "prod.test",
+        "display_name": "Prod Test",
+        "customer_key": "14",
+        "role": "officer",
+        "facility_ids": [63],
+        "avatar": "PT"
+      }
+    ]
+  }
+}

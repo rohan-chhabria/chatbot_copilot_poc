@@ -41,6 +41,7 @@ from src.shared.config import (
     VANNA_COLLECTION_NAME,
 )
 from src.shared.logger import get_logger
+from src.tenant.customer_config import get_customer_config
 from src.tenant.db_registry import execute_query
 from src.tenant.tenant_router import TenantContext
 
@@ -147,25 +148,46 @@ def _make_tool_context(user_id: str = "system", conversation_id: str = "") -> An
     )
 
 
-def get_llm_service():
-    global _llm_service
-    if _llm_service is None:
-        provider = LLM_PROVIDER.lower().strip()
-        if provider == "gemini":
-            from vanna.integrations.google import GeminiLlmService
-            _llm_service = GeminiLlmService(
-                model=GEMINI_MODEL,
-                api_key=GEMINI_API_KEY,
-                temperature=LLM_TEMPERATURE,
-            )
-            logger.info("Vanna 2.0 LLM: Gemini %s", GEMINI_MODEL)
-        else:
-            from vanna.integrations.openai import OpenAILlmService
-            _llm_service = OpenAILlmService(
-                model=OPENAI_MODEL, api_key=OPENAI_API_KEY,
-            )
-            logger.info("Vanna 2.0 LLM: OpenAI %s", OPENAI_MODEL)
-    return _llm_service
+_llm_services: dict[str, Any] = {}
+
+
+def get_llm_service(customer_key: str | None = None):
+    """Get LLM service, using customer-specific API keys from DynamoDB if available."""
+    global _llm_service, _llm_services
+
+    # Get customer config for API keys
+    config = get_customer_config(customer_key) if customer_key else {}
+    api_key_openai = config.get("openai_api_key") or OPENAI_API_KEY
+    api_key_gemini = config.get("gemini_api_key") or GEMINI_API_KEY
+    model_openai = config.get("llm_model") or OPENAI_MODEL
+    model_gemini = config.get("gemini_model") or GEMINI_MODEL
+    provider = (config.get("llm_provider") or LLM_PROVIDER).lower().strip()
+    temperature = config.get("llm_temperature", LLM_TEMPERATURE)
+
+    # Create cache key based on provider and API key
+    cache_key = f"{provider}:{api_key_openai[:10] if api_key_openai else 'none'}"
+
+    if cache_key in _llm_services:
+        return _llm_services[cache_key]
+
+    if provider == "gemini":
+        from vanna.integrations.google import GeminiLlmService
+        llm = GeminiLlmService(
+            model=model_gemini,
+            api_key=api_key_gemini,
+            temperature=temperature,
+        )
+        logger.info("Vanna 2.0 LLM: Gemini %s for customer=%s", model_gemini, customer_key)
+    else:
+        from vanna.integrations.openai import OpenAILlmService
+        llm = OpenAILlmService(
+            model=model_openai,
+            api_key=api_key_openai,
+        )
+        logger.info("Vanna 2.0 LLM: OpenAI %s for customer=%s", model_openai, customer_key)
+
+    _llm_services[cache_key] = llm
+    return llm
 
 
 def get_agent_memory():
@@ -207,6 +229,7 @@ async def generate_sql_via_llm(
     context: str = "",
     user_id: str = "system",
     timeout: int | None = None,
+    customer_key: str | None = None,
 ) -> str | None:
     """Generate SQL from a natural language question via Vanna 2.0 LLM + memory.
 
@@ -215,8 +238,9 @@ async def generate_sql_via_llm(
         context: Additional context for SQL generation
         user_id: User identifier for logging
         timeout: Request timeout in seconds (default: INMATE_PIPELINE_TIMEOUT)
+        customer_key: Customer key for loading API keys from config
     """
-    llm = get_llm_service()
+    llm = get_llm_service(customer_key)
     effective_timeout = timeout or INMATE_PIPELINE_TIMEOUT
 
     # Memory search with timeout (M4 fix)
@@ -388,7 +412,7 @@ class AgentPipeline:
                 session, question, f"Query execution failed: {str(e)}"
             )
 
-        response = await self._build_response(rows, question, sql)
+        response = await self._build_response(rows, question, sql, customer_key=session.customer_key)
         response = enrich_data_response(response, question, session)
         self._save_turn(session, question, sql, response)
         return response
@@ -476,7 +500,7 @@ class AgentPipeline:
             return
 
         yield {"event": "status", "data": "Summarizing results..."}
-        response = await self._build_response(rows, question, sql)
+        response = await self._build_response(rows, question, sql, customer_key=session.customer_key)
         response = enrich_data_response(response, question, session)
         self._save_turn(session, question, sql, response)
         yield {"event": "result", "data": response}
@@ -512,7 +536,9 @@ class AgentPipeline:
 
     async def _generate_sql(self, question: str, session: Session) -> str | None:
         context = build_sql_context(question, session)
-        sql = await generate_sql_via_llm(question, context, user_id=session.user_id)
+        sql = await generate_sql_via_llm(
+            question, context, user_id=session.user_id, customer_key=session.customer_key
+        )
         if sql and not _is_error_message(sql):
             sql = _fix_inmate_name_order(sql)
             return sql
@@ -527,7 +553,9 @@ class AgentPipeline:
             f"Original question: {question}\n"
             "Generate a corrected MySQL SELECT query."
         )
-        sql = await generate_sql_via_llm(question, feedback, user_id=session.user_id)
+        sql = await generate_sql_via_llm(
+            question, feedback, user_id=session.user_id, customer_key=session.customer_key
+        )
         if sql and not _is_error_message(sql):
             result = validate_and_fix_sql(sql)
             return result.sql if result.is_valid else None
@@ -548,19 +576,19 @@ class AgentPipeline:
             rows = execute_query(tenant, retry_sql, limit=MAX_QUERY_RESULTS)
         except Exception:
             return None
-        response = await self._build_response(rows, question, retry_sql)
+        response = await self._build_response(rows, question, retry_sql, customer_key=session.customer_key)
         self._save_turn(session, question, retry_sql, response)
         return response
 
     async def _build_response(
-        self, rows: list[dict], question: str, sql: str,
+        self, rows: list[dict], question: str, sql: str, customer_key: str | None = None,
     ) -> dict[str, Any]:
         """Build response using LLM-enhanced insight summarization."""
         if not rows:
             return format_empty_response(question, sql)
 
         # Use insight-based summarization for better UX
-        return await format_response_with_insights(rows, question, sql)
+        return await format_response_with_insights(rows, question, sql, customer_key=customer_key)
 
     def _save_turn(
         self, session: Session, question: str, sql: str, response: dict[str, Any],

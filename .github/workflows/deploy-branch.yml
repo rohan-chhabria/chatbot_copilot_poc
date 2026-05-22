@@ -1,20 +1,48 @@
 # =============================================================================
 # Branch-based Auto Deployment
 # =============================================================================
-# - develop branch → deploys to 'dev' environment (automatic)
+# - develop branch → deploys to 'dev' environment
+# - staging branch → deploys to 'staging' environment
 # =============================================================================
 
 name: Deploy (Branch)
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, staging]
 
 permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
+  # ===========================================================================
+  # Determine Environment
+  # ===========================================================================
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      stack_name: ${{ steps.env.outputs.stack_name }}
+      ecr_repo: ${{ steps.env.outputs.ecr_repo }}
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "stack_name=SARAH-ChatBot-dev" >> $GITHUB_OUTPUT
+            echo "ecr_repo=sarah-chatbot-dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "staging" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+            echo "stack_name=SARAH-ChatBot-staging" >> $GITHUB_OUTPUT
+            echo "ecr_repo=sarah-chatbot-staging" >> $GITHUB_OUTPUT
+          fi
+
   # ===========================================================================
   # Lint (quick validation before deploy)
   # ===========================================================================
@@ -31,13 +59,13 @@ jobs:
       - run: ruff check src/ --output-format=github
 
   # ===========================================================================
-  # DEVELOP BRANCH → Dev environment
+  # Deploy
   # ===========================================================================
-  deploy-dev:
-    name: Deploy to Dev
-    needs: lint
+  deploy:
+    name: Deploy to ${{ needs.setup.outputs.environment }}
+    needs: [setup, lint]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ needs.setup.outputs.environment }}
 
     steps:
       - name: Checkout
@@ -47,7 +75,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -61,22 +89,16 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR Repository (if not exists)
-        id: create-ecr
+      - name: Get ECR URI
+        id: ecr-uri
         run: |
-          REPO_NAME="inmate-copilot-dev"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
-          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}"
-
-          aws ecr describe-repositories --repository-names $REPO_NAME 2>/dev/null || \
-            aws ecr create-repository --repository-name $REPO_NAME --image-scanning-configuration scanOnPush=true
-
+          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ needs.setup.outputs.ecr_repo }}"
           echo "ecr_uri=${ECR_URI}" >> $GITHUB_OUTPUT
 
       - name: Build & Push Docker Image
         run: |
-          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          ECR_URI="${{ steps.ecr-uri.outputs.ecr_uri }}"
           docker build -t $ECR_URI:${{ github.sha }} -t $ECR_URI:latest -f dockerfile .
           docker push $ECR_URI:${{ github.sha }}
           docker push $ECR_URI:latest
@@ -88,49 +110,75 @@ jobs:
       - name: SAM Deploy
         working-directory: infra
         run: |
-          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          ECR_URI="${{ steps.ecr-uri.outputs.ecr_uri }}"
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --config-env dev \
-            --image-repository $ECR_URI \
+            --config-env ${{ needs.setup.outputs.environment }} \
             --parameter-overrides "ContainerImage=$ECR_URI:${{ github.sha }}"
 
       - name: Wait for ECS Service
         run: |
           echo "Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
-            --cluster InmateCopilot-dev \
-            --services InmateCopilot-dev --no-cli-pager || echo "Service may still be starting"
+            --cluster ${{ needs.setup.outputs.stack_name }} \
+            --services ${{ needs.setup.outputs.stack_name }} \
+            --no-cli-pager || echo "Service may still be starting"
+
+      - name: Get API URL
+        id: api
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ needs.setup.outputs.stack_name }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "api_url=${API_URL}" >> $GITHUB_OUTPUT
 
       - name: Summary
         run: |
-          echo "## ✅ Deployed to dev" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Stack: \`InmateCopilot-dev\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: \`${{ steps.create-ecr.outputs.ecr_uri }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Deployed to ${{ needs.setup.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stack | \`${{ needs.setup.outputs.stack_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| API URL | ${{ steps.api.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ steps.ecr-uri.outputs.ecr_uri }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
   # Smoke Test
   # ===========================================================================
   smoke-test:
     name: Smoke Test
-    needs: deploy-dev
+    needs: [setup, deploy]
     runs-on: ubuntu-latest
     if: success()
 
     steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get API URL
+        id: api
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ needs.setup.outputs.stack_name }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "api_url=${API_URL}" >> $GITHUB_OUTPUT
+
       - name: Health check
         run: |
-          API_URL="${{ secrets.DEV_API_URL }}"
-          if [ -z "$API_URL" ]; then
-            echo "DEV_API_URL not set, skipping smoke test"
-            exit 0
-          fi
+          API_URL="${{ steps.api.outputs.api_url }}"
+          echo "Testing: $API_URL/health"
           
           for i in 1 2 3 4 5; do
-            if curl -sf $API_URL/health; then
-              echo "Health check passed"
+            RESPONSE=$(curl -sf "$API_URL/health" || echo "FAILED")
+            if [[ "$RESPONSE" != "FAILED" ]]; then
+              echo "Health check passed: $RESPONSE"
               exit 0
             fi
             echo "Attempt $i failed, retrying in 30s..."
@@ -141,14 +189,12 @@ jobs:
 
       - name: Basic chat test
         run: |
-          API_URL="${{ secrets.DEV_API_URL }}"
-          if [ -z "$API_URL" ]; then
-            echo "DEV_API_URL not set, skipping chat test"
-            exit 0
-          fi
+          API_URL="${{ steps.api.outputs.api_url }}"
           
-          RESPONSE=$(curl -s -X POST $API_URL/chat \
+          RESPONSE=$(curl -s -X POST "$API_URL/chat" \
             -H "Content-Type: application/json" \
             -d '{"question":"hello","customer_key":"14","user_id":"smoketest","facility_ids":[63]}')
+          
+          echo "Response: $RESPONSE"
           echo "$RESPONSE" | jq -e '.session_id' || exit 1
           echo "Chat test passed"

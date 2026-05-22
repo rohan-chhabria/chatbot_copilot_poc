@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SARAH ChatBot — Test Console</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --bg2: #161822;
+      --card: #1c1f2e;
+      --accent: #4f7cff;
+      --accent-h: #6b93ff;
+      --txt: #e4e6f0;
+      --txt2: #8b8fa3;
+      --txt3: #555972;
+      --border: #262940;
+      --ok: #34d399;
+      --warn: #fbbf24;
+      --err: #f87171;
+      --r: 10px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--txt); min-height: 100vh; }
+    
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 20px; font-weight: 700; }
+    .header h1 span { color: var(--accent); }
+    .header .status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .header .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .header .dot.ok { background: var(--ok); }
+    .header .dot.err { background: var(--err); }
+    .header .dot.warn { background: var(--warn); }
+
+    .layout { display: grid; grid-template-columns: 300px 1fr; height: calc(100vh - 60px); }
+
+    .sidebar {
+      background: var(--bg2); border-right: 1px solid var(--border);
+      padding: 16px; overflow-y: auto;
+    }
+    .sidebar h3 { font-size: 11px; color: var(--txt3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+    
+    .stack-btn {
+      width: 100%; text-align: left; padding: 12px 14px;
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+      color: var(--txt); cursor: pointer; margin-bottom: 8px; transition: all 0.2s;
+    }
+    .stack-btn:hover { border-color: var(--accent); background: rgba(79, 124, 255, 0.06); }
+    .stack-btn.active { border-color: var(--ok); background: rgba(52, 211, 153, 0.08); }
+    .stack-btn .name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .stack-btn .url { font-size: 11px; color: var(--txt3); word-break: break-all; }
+    .stack-btn .desc { font-size: 10px; color: var(--txt2); margin-top: 4px; }
+
+    .user-list { margin-top: 20px; }
+    .user-btn {
+      width: 100%; display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--txt); cursor: pointer; margin-bottom: 6px;
+    }
+    .user-btn:hover { border-color: var(--accent); }
+    .user-btn.active { border-color: var(--ok); }
+    .user-btn .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 11px; color: #fff;
+    }
+    .user-btn .info { flex: 1; text-align: left; }
+    .user-btn .name { font-weight: 600; font-size: 12px; }
+    .user-btn .role { font-size: 10px; color: var(--txt2); text-transform: capitalize; }
+
+    .main { display: flex; flex-direction: column; }
+
+    .info-bar {
+      padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border);
+      display: flex; gap: 24px; font-size: 12px;
+    }
+    .info-bar .item { display: flex; align-items: center; gap: 6px; }
+    .info-bar .label { color: var(--txt3); }
+    .info-bar .value { color: var(--txt); font-family: 'JetBrains Mono', monospace; }
+
+    .chat-area { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    
+    .msg {
+      max-width: 80%; padding: 12px 16px; border-radius: 12px;
+      font-size: 14px; line-height: 1.6; white-space: pre-wrap;
+    }
+    .msg.bot { align-self: flex-start; background: var(--card); border: 1px solid var(--border); }
+    .msg.user { align-self: flex-end; background: #2a3358; }
+    .msg .sender { font-size: 10px; font-weight: 600; margin-bottom: 4px; }
+    .msg.bot .sender { color: var(--ok); }
+    .msg.user .sender { color: var(--accent); }
+
+    .status-msg {
+      align-self: center; font-size: 11px; color: var(--txt3);
+      padding: 6px 14px; background: rgba(79, 124, 255, 0.06); border-radius: 16px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .input-area {
+      padding: 16px 20px; background: var(--bg2); border-top: 1px solid var(--border);
+      display: flex; gap: 10px;
+    }
+    .input-area textarea {
+      flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--txt); font-size: 14px; resize: none; outline: none;
+      font-family: inherit; min-height: 44px; max-height: 120px;
+    }
+    .input-area textarea:focus { border-color: var(--accent); }
+    .input-area textarea::placeholder { color: var(--txt3); }
+    .input-area button {
+      background: var(--accent); border: none; border-radius: 8px;
+      width: 44px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .input-area button:hover { background: var(--accent-h); }
+    .input-area button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .input-area button svg { width: 18px; height: 18px; fill: #fff; }
+
+    .scope-opts { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+    .scope-btn {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      cursor: pointer; color: var(--txt); text-align: left; transition: all 0.2s;
+    }
+    .scope-btn:hover { border-color: var(--accent); transform: translateX(4px); }
+    .scope-btn .icon { font-size: 18px; }
+    .scope-btn .label { font-weight: 600; font-size: 12px; }
+    .scope-btn .desc { font-size: 11px; color: var(--txt2); margin-left: auto; }
+
+    .custom-url {
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+    }
+    .custom-url input {
+      width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--txt); font-size: 12px; margin-top: 8px;
+    }
+    .custom-url input:focus { border-color: var(--accent); outline: none; }
+    .custom-url button {
+      width: 100%; margin-top: 8px; padding: 10px; background: var(--accent);
+      border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SARAH <span>ChatBot</span> — Test Console</h1>
+    <div class="status">
+      <div class="dot" id="statusDot"></div>
+      <span id="statusText">Not connected</span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar">
+      <h3>Environment</h3>
+      <div id="stackList"></div>
+
+      <div class="custom-url">
+        <h3>Custom Endpoint</h3>
+        <input type="text" id="customUrl" placeholder="http://localhost:8000">
+        <button onclick="connectCustom()">Connect</button>
+      </div>
+
+      <div class="user-list">
+        <h3>Test Users</h3>
+        <div id="userList"></div>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="info-bar">
+        <div class="item"><span class="label">Session:</span><span class="value" id="sessionId">—</span></div>
+        <div class="item"><span class="label">Customer:</span><span class="value" id="customerKey">—</span></div>
+        <div class="item"><span class="label">Turns:</span><span class="value" id="turnCount">0</span></div>
+      </div>
+
+      <div class="chat-area" id="chatArea">
+        <div class="msg bot">
+          <div class="sender">System</div>
+          <div>Select an environment and user to start testing.</div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea id="chatInput" placeholder="Type your message..." rows="1" onkeydown="handleKey(event)"></textarea>
+        <button id="sendBtn" onclick="sendMessage()" disabled>
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let state = {
+      stack: null,
+      apiUrl: null,
+      user: null,
+      sessionId: null,
+      turns: 0,
+      sending: false
+    };
+
+    const STACKS = {
+      local: { name: "Local Development", api_url: "http://localhost:8065", description: "Local server", customer_key: "demo" },
+      dev: { name: "AWS Dev", api_url: "http://SARAH-ChatBot-dev-257557694.us-east-1.elb.amazonaws.com", description: "Development environment", customer_key: "14" },
+      staging: { name: "AWS Staging", api_url: "", description: "Configure after deployment", customer_key: "14" },
+      prod: { name: "AWS Production", api_url: "", description: "Configure after deployment", customer_key: "14" }
+    };
+
+    const USERS = {
+      local: [
+        { user_id: "Richard.Bell", display_name: "Richard Bell", customer_key: "demo", role: "officer", facility_ids: [63], avatar: "RB" },
+        { user_id: "Mark.Kent", display_name: "Mark Kent", customer_key: "demo", role: "warden", facility_ids: [63, 164], avatar: "MK" }
+      ],
+      dev: [
+        { user_id: "test.officer", display_name: "Test Officer", customer_key: "14", role: "officer", facility_ids: [63], avatar: "TO" },
+        { user_id: "test.warden", display_name: "Test Warden", customer_key: "14", role: "warden", facility_ids: [63], avatar: "TW" }
+      ],
+      staging: [
+        { user_id: "qa.tester", display_name: "QA Tester", customer_key: "14", role: "officer", facility_ids: [63], avatar: "QA" }
+      ],
+      prod: [
+        { user_id: "prod.test", display_name: "Prod Test", customer_key: "14", role: "officer", facility_ids: [63], avatar: "PT" }
+      ]
+    };
+
+    function init() {
+      renderStacks();
+      loadSavedState();
+    }
+
+    function loadSavedState() {
+      try {
+        const saved = localStorage.getItem('sarahTestState');
+        if (saved) {
+          const { stack, customUrl } = JSON.parse(saved);
+          if (customUrl) {
+            document.getElementById('customUrl').value = customUrl;
+            connectCustom();
+          } else if (stack && STACKS[stack]) {
+            selectStack(stack);
+          }
+        }
+      } catch (e) {}
+    }
+
+    function saveState() {
+      localStorage.setItem('sarahTestState', JSON.stringify({
+        stack: state.stack,
+        customUrl: state.stack === 'custom' ? state.apiUrl : null
+      }));
+    }
+
+    function renderStacks() {
+      const list = document.getElementById('stackList');
+      list.innerHTML = Object.entries(STACKS).map(([key, stack]) => `
+        <button class="stack-btn ${state.stack === key ? 'active' : ''}" onclick="selectStack('${key}')" ${!stack.api_url ? 'disabled style="opacity:0.5"' : ''}>
+          <div class="name">${stack.name}</div>
+          <div class="url">${stack.api_url || 'Not configured'}</div>
+          <div class="desc">${stack.description}</div>
+        </button>
+      `).join('');
+    }
+
+    function renderUsers() {
+      const list = document.getElementById('userList');
+      const users = USERS[state.stack] || USERS.dev;
+      list.innerHTML = users.map(u => `
+        <button class="user-btn ${state.user?.user_id === u.user_id ? 'active' : ''}" onclick='selectUser(${JSON.stringify(u)})'>
+          <div class="avatar">${u.avatar}</div>
+          <div class="info">
+            <div class="name">${u.display_name}</div>
+            <div class="role">${u.role}</div>
+          </div>
+        </button>
+      `).join('');
+    }
+
+    async function selectStack(key) {
+      state.stack = key;
+      state.apiUrl = STACKS[key].api_url;
+      state.user = null;
+      state.sessionId = null;
+      renderStacks();
+      renderUsers();
+      await checkHealth();
+      saveState();
+    }
+
+    async function connectCustom() {
+      const url = document.getElementById('customUrl').value.trim();
+      if (!url) return;
+      state.stack = 'custom';
+      state.apiUrl = url.replace(/\/$/, '');
+      state.user = null;
+      state.sessionId = null;
+      renderStacks();
+      renderUsers();
+      await checkHealth();
+      saveState();
+    }
+
+    async function checkHealth() {
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      
+      try {
+        const r = await fetch(`${state.apiUrl}/health`, { timeout: 5000 });
+        const d = await r.json();
+        dot.className = 'dot ok';
+        text.textContent = `Connected (${d.environment || 'unknown'})`;
+      } catch (e) {
+        dot.className = 'dot err';
+        text.textContent = 'Connection failed';
+      }
+    }
+
+    async function selectUser(user) {
+      state.user = user;
+      state.turns = 0;
+      renderUsers();
+      
+      document.getElementById('customerKey').textContent = user.customer_key;
+      document.getElementById('turnCount').textContent = '0';
+      document.getElementById('sendBtn').disabled = false;
+      
+      clearChat();
+      addBotMessage("System", `Selected user: ${user.display_name} (${user.role}). You can now start chatting.`);
+      
+      // Try to init session if local endpoint supports it
+      if (state.stack === 'local') {
+        try {
+          const r = await fetch(`${state.apiUrl}/session/init`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: user.user_id })
+          });
+          const d = await r.json();
+          state.sessionId = d.session_id;
+          document.getElementById('sessionId').textContent = d.session_id.slice(0, 12) + '...';
+          addBotMessage(d.bot_name || 'SARAH', d.greeting);
+        } catch (e) {
+          addBotMessage("System", "Session init not available. Using direct chat.");
+        }
+      }
+    }
+
+    function clearChat() {
+      document.getElementById('chatArea').innerHTML = '';
+    }
+
+    function addBotMessage(sender, text) {
+      const area = document.getElementById('chatArea');
+      const msg = document.createElement('div');
+      msg.className = 'msg bot';
+      msg.innerHTML = `<div class="sender">${esc(sender)}</div><div>${formatText(text)}</div>`;
+      area.appendChild(msg);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function addUserMessage(text) {
+      const area = document.getElementById('chatArea');
+      const msg = document.createElement('div');
+      msg.className = 'msg user';
+      msg.innerHTML = `<div class="sender">You</div><div>${esc(text)}</div>`;
+      area.appendChild(msg);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function addStatus(text) {
+      const area = document.getElementById('chatArea');
+      const el = document.createElement('div');
+      el.className = 'status-msg';
+      el.id = 'statusMsg';
+      el.innerHTML = `<div class="spinner"></div>${esc(text)}`;
+      area.appendChild(el);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function updateStatus(text) {
+      const el = document.getElementById('statusMsg');
+      if (el) el.innerHTML = `<div class="spinner"></div>${esc(text)}`;
+    }
+
+    function removeStatus() {
+      const el = document.getElementById('statusMsg');
+      if (el) el.remove();
+    }
+
+    function renderScopeOptions(options) {
+      const area = document.getElementById('chatArea');
+      const msg = document.createElement('div');
+      msg.className = 'msg bot';
+      let html = `<div class="sender">SARAH</div><div>Select a topic:<div class="scope-opts">`;
+      options.forEach(opt => {
+        html += `<button class="scope-btn" onclick='selectScope("${opt.id}")'><span class="icon">${opt.icon || '📋'}</span><span class="label">${esc(opt.label)}</span><span class="desc">${esc(opt.description || '')}</span></button>`;
+      });
+      html += `</div></div>`;
+      msg.innerHTML = html;
+      area.appendChild(msg);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    async function selectScope(scopeId) {
+      addStatus('Switching scope...');
+      try {
+        const r = await fetch(`${state.apiUrl}/scope/select`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: state.sessionId, scope: scopeId })
+        });
+        const d = await r.json();
+        removeStatus();
+        addBotMessage('SARAH', d.summary || `Now exploring: ${scopeId}`);
+      } catch (e) {
+        removeStatus();
+        addBotMessage('System', `Error: ${e.message}`);
+      }
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text || state.sending || !state.user) return;
+
+      state.sending = true;
+      input.value = '';
+      document.getElementById('sendBtn').disabled = true;
+      addUserMessage(text);
+      addStatus('Thinking...');
+
+      try {
+        const payload = {
+          question: text,
+          session_id: state.sessionId,
+          customer_key: state.user.customer_key,
+          user_id: state.user.user_id,
+          facility_ids: state.user.facility_ids,
+          role: state.user.role
+        };
+
+        const r = await fetch(`${state.apiUrl}/chat/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '', result = null, eventName = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) eventName = line.slice(6).trim();
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (!data) continue;
+
+              if (eventName === 'status') updateStatus(data);
+              else if (eventName === 'result') {
+                try { result = JSON.parse(data); } catch {}
+              }
+              else if (eventName === 'error') {
+                removeStatus();
+                addBotMessage('System', `Error: ${data}`);
+              }
+              else if (eventName === 'session') {
+                try {
+                  const s = JSON.parse(data);
+                  if (s.session_id) {
+                    state.sessionId = s.session_id;
+                    document.getElementById('sessionId').textContent = s.session_id.slice(0, 12) + '...';
+                  }
+                } catch {}
+              }
+              else if (eventName === 'scope_options') {
+                try {
+                  const opts = JSON.parse(data);
+                  removeStatus();
+                  if (opts.options?.length) renderScopeOptions(opts.options);
+                } catch {}
+              }
+            }
+          }
+        }
+
+        removeStatus();
+        if (result) {
+          if (result.requires_scope && result.options) {
+            renderScopeOptions(result.options);
+          } else {
+            addBotMessage('SARAH', result.summary || 'Done.');
+            state.turns += 2;
+            document.getElementById('turnCount').textContent = state.turns;
+          }
+        }
+      } catch (e) {
+        removeStatus();
+        addBotMessage('System', `Connection error: ${e.message}`);
+      }
+
+      state.sending = false;
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('chatInput').focus();
+    }
+
+    function esc(t) {
+      const d = document.createElement('div');
+      d.textContent = t;
+      return d.innerHTML;
+    }
+
+    function formatText(t) {
+      let s = esc(t);
+      s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      s = s.replace(/^(\s*)(•|\-)\s/gm, '$1<span style="color:var(--accent)">•</span> ');
+      return s;
+    }
+
+    init();
+  </script>
+</body>
+</html>

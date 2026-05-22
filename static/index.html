@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>InmateCopilot — Intelligence Dashboard</title>
+  <title>SARAH ChatBot — Intelligence Dashboard</title>
   <style>
     :root {
       --bg: #0f1117;
@@ -87,8 +87,58 @@
     .login-box .sub {
       color: var(--txt2);
       font-size: 14px;
-      margin-bottom: 32px
+      margin-bottom: 16px
     }
+
+    .backend-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      justify-content: center
+    }
+
+    .backend-btn {
+      padding: 8px 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--txt2);
+      cursor: pointer;
+      font-family: var(--f);
+      font-size: 12px;
+      transition: all 0.2s
+    }
+
+    .backend-btn:hover {
+      border-color: var(--accent);
+      color: var(--txt)
+    }
+
+    .backend-btn.active {
+      border-color: var(--ok);
+      background: rgba(52, 211, 153, 0.1);
+      color: var(--ok)
+    }
+
+    .backend-status {
+      font-size: 11px;
+      color: var(--txt3);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px
+    }
+
+    .backend-status .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--txt3)
+    }
+
+    .backend-status .dot.ok { background: var(--ok) }
+    .backend-status .dot.err { background: var(--err) }
 
     .ucards {
       display: flex;
@@ -736,6 +786,161 @@
       color: var(--txt2);
       margin-left: auto
     }
+
+    /* Debug panels for request/response */
+    .debug-panels {
+      display: flex;
+      gap: 12px;
+      padding: 16px 24px;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+    }
+
+    .debug-panel {
+      flex: 1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+
+    .debug-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .debug-header:hover {
+      background: rgba(79, 124, 255, 0.05);
+    }
+
+    .debug-title {
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .debug-title .badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .debug-title .badge.req {
+      background: rgba(79, 124, 255, 0.15);
+      color: var(--accent);
+    }
+
+    .debug-title .badge.res {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--ok);
+    }
+
+    .debug-title .badge.err {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--err);
+    }
+
+    .debug-meta {
+      font-size: 10px;
+      color: var(--txt3);
+      display: flex;
+      gap: 12px;
+    }
+
+    .debug-meta span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .debug-body {
+      max-height: 300px;
+      overflow-y: auto;
+      padding: 12px;
+      font-family: var(--fm);
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--txt2);
+    }
+
+    .debug-body.collapsed {
+      display: none;
+    }
+
+    .debug-empty {
+      color: var(--txt3);
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .json-key { color: #7dd3fc; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-boolean { color: #c084fc; }
+    .json-null { color: #94a3b8; }
+
+    .debug-toggle {
+      font-size: 10px;
+      color: var(--txt3);
+      transition: transform 0.2s;
+    }
+
+    .debug-header.expanded .debug-toggle {
+      transform: rotate(180deg);
+    }
+
+    .debug-toolbar {
+      display: flex;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .debug-toolbar button {
+      padding: 4px 10px;
+      font-size: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--txt2);
+      cursor: pointer;
+      font-family: var(--f);
+    }
+
+    .debug-toolbar button:hover {
+      border-color: var(--accent);
+      color: var(--txt);
+    }
+
+    .endpoint-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .endpoint-badge.post {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--warn);
+    }
+
+    .endpoint-badge.get {
+      background: rgba(52, 211, 153, 0.15);
+      color: var(--ok);
+    }
   </style>
 </head>
 
@@ -743,15 +948,25 @@
 
   <div id="login">
     <div class="login-box">
-      <div class="logo">Inmate<span>Copilot</span></div>
-      <div class="sub">Intelligence Dashboard — Select your profile</div>
+      <div class="logo">SARAH <span>ChatBot</span></div>
+      <div class="sub">Intelligence Dashboard</div>
+      <div class="backend-selector">
+        <button class="backend-btn active" id="btn-local" onclick="selectBackend('local')">🖥️ Local</button>
+        <button class="backend-btn" id="btn-dev" onclick="selectBackend('dev')">☁️ AWS Dev</button>
+        <button class="backend-btn" id="btn-custom" onclick="selectBackend('custom')">🔧 Custom</button>
+      </div>
+      <div class="backend-status" id="backend-status">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Select backend</span>
+      </div>
+      <input type="text" id="custom-url" placeholder="Enter custom API URL..." style="display:none;width:100%;padding:10px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--txt);font-size:12px">
       <div class="ucards" id="ucards"></div>
     </div>
   </div>
 
   <div id="dash">
     <div class="top">
-      <div class="br">Inmate<span>Copilot</span></div>
+      <div class="br">SARAH <span>ChatBot</span></div>
       <div style="display:flex;align-items:center;gap:14px">
         <div class="ui">
           <div class="ua" id="da"></div>
@@ -781,6 +996,43 @@
           <div class="sb">Executed</div>
         </div>
       </div>
+
+      <!-- Debug Panels - Request/Response -->
+      <div style="font-size:15px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">
+        <span>API Request / Response</span>
+        <button onclick="clearDebugPanels()" style="padding:4px 10px;font-size:10px;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--txt2);cursor:pointer;font-family:var(--f)">Clear</button>
+      </div>
+      <div class="debug-panels">
+        <div class="debug-panel">
+          <div class="debug-header expanded" onclick="toggleDebug('req')">
+            <div class="debug-title">
+              <span class="badge req">REQUEST</span>
+              <span id="req-endpoint">—</span>
+              <span class="endpoint-badge post" id="req-method" style="display:none">POST</span>
+            </div>
+            <span class="debug-toggle">▼</span>
+          </div>
+          <div class="debug-body" id="req-body">
+            <div class="debug-empty">Send a message to see the request</div>
+          </div>
+        </div>
+        <div class="debug-panel">
+          <div class="debug-header expanded" onclick="toggleDebug('res')">
+            <div class="debug-title">
+              <span class="badge res" id="res-badge">RESPONSE</span>
+              <span id="res-status">—</span>
+            </div>
+            <div class="debug-meta">
+              <span id="res-time">—</span>
+              <span class="debug-toggle">▼</span>
+            </div>
+          </div>
+          <div class="debug-body" id="res-body">
+            <div class="debug-empty">Response will appear here</div>
+          </div>
+        </div>
+      </div>
+
       <!-- <div style="font-size:15px;font-weight:600;margin-bottom:14px">Quick Actions</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px" id="quick-actions">
         <button onclick="quickAsk('Show fire watch notes today')"
@@ -879,8 +1131,19 @@
   </div>
 
   <script>
-    const API = location.origin;
-    let S = { user: null, sid: null, bot: 'Sarah', turns: 0, queries: 0, times: [], sending: false, scope: null };
+    // Backend configuration
+    const BACKENDS = {
+      local: { url: 'http://localhost:8065', name: 'Local', hasSessionInit: true },
+      dev: { url: 'http://SARAH-ChatBot-dev-257557694.us-east-1.elb.amazonaws.com', name: 'AWS Dev', hasSessionInit: false },
+      custom: { url: '', name: 'Custom', hasSessionInit: false }
+    };
+    
+    let API = location.origin;
+    let currentBackend = 'local';
+    let hasSessionInit = true;
+    let localUsers = [];
+    
+    let S = { user: null, sid: null, bot: 'SARAH', turns: 0, queries: 0, times: [], sending: false, scope: null };
 
     /* ── TTS State ── */
     let ttsOn = false;
@@ -944,8 +1207,132 @@
     /* ── Init ── */
     async function init() {
       loadTTSCfg();
-      try { const r = await fetch(API + '/users'); const d = await r.json(); S.bot = d.bot_name || 'Sarah'; renderUC(d.users) }
-      catch (e) { document.getElementById('ucards').innerHTML = '<div style="color:var(--err);font-size:13px">Backend not reachable.</div>' }
+      // Load saved backend preference
+      const saved = localStorage.getItem('selectedBackend');
+      if (saved && BACKENDS[saved]) {
+        await selectBackend(saved);
+      } else {
+        await selectBackend('local');
+      }
+    }
+
+    async function selectBackend(backend) {
+      currentBackend = backend;
+      localStorage.setItem('selectedBackend', backend);
+      
+      // Update button states
+      document.querySelectorAll('.backend-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('btn-' + backend).classList.add('active');
+      
+      // Show/hide custom URL input
+      const customInput = document.getElementById('custom-url');
+      if (backend === 'custom') {
+        customInput.style.display = 'block';
+        customInput.onchange = () => {
+          BACKENDS.custom.url = customInput.value.trim().replace(/\/$/, '');
+          checkBackendHealth();
+        };
+        const savedUrl = localStorage.getItem('customBackendUrl');
+        if (savedUrl) {
+          customInput.value = savedUrl;
+          BACKENDS.custom.url = savedUrl;
+        }
+      } else {
+        customInput.style.display = 'none';
+      }
+      
+      API = BACKENDS[backend].url || location.origin;
+      hasSessionInit = BACKENDS[backend].hasSessionInit;
+      
+      await checkBackendHealth();
+      await loadUsers();
+    }
+
+    async function checkBackendHealth() {
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      
+      if (currentBackend === 'custom' && !BACKENDS.custom.url) {
+        dot.className = 'dot';
+        text.textContent = 'Enter URL above';
+        return;
+      }
+      
+      dot.className = 'dot';
+      text.textContent = 'Checking...';
+      
+      const t0 = Date.now();
+      // Update debug panel for health check
+      if (document.getElementById('req-endpoint')) {
+        updateDebugRequest('/health', 'GET', {});
+      }
+      
+      try {
+        const r = await fetch(API + '/health', { signal: AbortSignal.timeout(5000) });
+        const d = await r.json();
+        const elapsed = Date.now() - t0;
+        
+        // Update debug response
+        if (document.getElementById('res-body')) {
+          updateDebugResponse(d, r.status, elapsed);
+        }
+        
+        dot.className = 'dot ok';
+        text.textContent = `Connected (${d.environment || BACKENDS[currentBackend].name})`;
+        if (currentBackend === 'custom') {
+          localStorage.setItem('customBackendUrl', BACKENDS.custom.url);
+        }
+      } catch (e) {
+        dot.className = 'dot err';
+        text.textContent = 'Connection failed';
+        if (document.getElementById('res-body')) {
+          updateDebugResponse({ error: e.message }, 0, Date.now() - t0);
+        }
+      }
+    }
+
+    async function loadUsers() {
+      document.getElementById('ucards').innerHTML = '<div style="color:var(--txt3);font-size:12px">Loading users...</div>';
+      
+      if (hasSessionInit) {
+        // Local mode - fetch from /users endpoint
+        try {
+          const r = await fetch(API + '/users');
+          const d = await r.json();
+          S.bot = d.bot_name || 'SARAH';
+          renderUC(d.users);
+        } catch (e) {
+          document.getElementById('ucards').innerHTML = '<div style="color:var(--err);font-size:13px">Backend not reachable. Start local server with: make run</div>';
+        }
+      } else {
+        // Deployed mode - load from users.json or use hardcoded users
+        try {
+          // Try multiple paths for users.json
+          let d = null;
+          for (const path of ['/users.json', '/static/users.json', '/local/users.json', 'users.json']) {
+            try {
+              const r = await fetch(path);
+              if (r.ok) { d = await r.json(); break; }
+            } catch {}
+          }
+          
+          if (d && d.users) {
+            localUsers = d.users.map(u => ({ ...u, customer_key: '14' }));
+            renderUC(localUsers);
+          } else {
+            throw new Error('No users found');
+          }
+        } catch (e) {
+          // Fallback to hardcoded users for deployed testing
+          localUsers = [
+            { user_id: 'test.officer', display_name: 'Test Officer', customer_key: '14', role: 'officer', facility_ids: [63], avatar: 'TO' },
+            { user_id: 'test.warden', display_name: 'Test Warden', customer_key: '14', role: 'warden', facility_ids: [63], avatar: 'TW' },
+            { user_id: 'Richard.Bell', display_name: 'Richard Bell', customer_key: '14', role: 'officer', facility_ids: [63], avatar: 'RB' },
+            { user_id: 'Mark.Kent', display_name: 'Mark Kent', customer_key: '14', role: 'warden', facility_ids: [63, 164, 182], avatar: 'MK' }
+          ];
+          renderUC(localUsers);
+        }
+      }
     }
 
     function renderUC(users) {
@@ -956,30 +1343,42 @@
 
     async function pickUser(u) {
       S.user = u; S.turns = 0; S.queries = 0; S.times = [];
-      try {
-        const r = await fetch(API + '/session/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: u.user_id }) });
-        const d = await r.json();
-        S.sid = d.session_id; S.bot = d.bot_name; S.user = { ...S.user, ...d.user };
+      
+      if (hasSessionInit) {
+        // Local mode - use session/init
+        try {
+          const r = await fetch(API + '/session/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: u.user_id }) });
+          const d = await r.json();
+          S.sid = d.session_id; S.bot = d.bot_name || 'SARAH'; S.user = { ...S.user, ...d.user };
+          document.getElementById('msgs').innerHTML = '';
+          showDash(); addBot(d.greeting);
+        } catch (e) { alert('Session failed: ' + e.message) }
+      } else {
+        // Deployed mode - skip session/init, start directly
+        S.sid = null; // Will be set by first chat response
+        S.bot = 'SARAH';
+        S.user = { ...u, display_name: u.display_name || u.user_id, avatar: u.avatar || u.user_id.slice(0,2).toUpperCase() };
         document.getElementById('msgs').innerHTML = '';
-        showDash(); addBot(d.greeting);
-      } catch (e) { alert('Session failed: ' + e.message) }
+        showDash();
+        addBot(`Welcome ${S.user.display_name}! I'm SARAH — your intelligent assistant. How can I help you today?`);
+      }
     }
 
     function showDash() {
       document.getElementById('login').style.display = 'none';
       document.getElementById('dash').style.display = 'block';
-      document.getElementById('da').textContent = S.user.avatar;
+      document.getElementById('da').textContent = S.user.avatar || '??';
       document.getElementById('dn').textContent = S.user.display_name;
       document.getElementById('dr').textContent = S.user.role;
-      document.getElementById('ds').textContent = S.sid.slice(0, 12) + '…';
+      document.getElementById('ds').textContent = S.sid ? S.sid.slice(0, 12) + '…' : 'Pending...';
       document.getElementById('bav').textContent = S.bot[0];
       document.getElementById('bnh').textContent = S.bot;
-      document.getElementById('csl').textContent = 'Session: ' + S.sid.slice(0, 8) + '…';
+      document.getElementById('csl').textContent = S.sid ? 'Session: ' + S.sid.slice(0, 8) + '…' : 'No session yet';
     }
 
     function logout() {
       speechSynthesis.cancel();
-      S = { user: null, sid: null, bot: 'Sarah', turns: 0, queries: 0, times: [], sending: false };
+      S = { user: null, sid: null, bot: 'SARAH', turns: 0, queries: 0, times: [], sending: false };
       document.getElementById('login').style.display = 'flex';
       document.getElementById('dash').style.display = 'none';
       document.getElementById('msgs').innerHTML = '';
@@ -1028,14 +1427,25 @@
 
     async function selectScope(scopeId) {
       addStatus('Switching scope...');
+      const t0 = Date.now();
+      const requestPayload = { session_id: S.sid, scope: scopeId };
+      updateDebugRequest('/scope/select', 'POST', requestPayload);
+      
       try {
-        const r = await fetch(API + '/scope/select', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: S.sid, scope: scopeId }) });
+        const r = await fetch(API + '/scope/select', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestPayload) });
         const d = await r.json(); rmStatus();
+        const elapsed = Date.now() - t0;
+        updateDebugResponse(d, r.status, elapsed);
+        
         if (!r.ok) { addBot('Error: ' + (d.detail || d.error || 'Failed to switch scope')); return }
         S.scope = scopeId;
         updateScopeBar(d.scope_label || scopeId, d.scope_icon);
         addBot(d.summary || `Now exploring: ${d.scope_label || scopeId}`);
-      } catch (e) { rmStatus(); addBot('Failed to switch scope: ' + e.message) }
+      } catch (e) { 
+        rmStatus(); 
+        addBot('Failed to switch scope: ' + e.message);
+        updateDebugResponse({ error: e.message }, 0, Date.now() - t0);
+      }
     }
 
     function updateScopeBar(label, icon) {
@@ -1051,12 +1461,22 @@
     }
 
     async function showScopeOptions() {
+      const t0 = Date.now();
+      const endpoint = '/scope/options?session_id=' + encodeURIComponent(S.sid);
+      updateDebugRequest(endpoint, 'GET', { session_id: S.sid });
+      
       try {
-        const r = await fetch(API + '/scope/options?session_id=' + encodeURIComponent(S.sid));
+        const r = await fetch(API + endpoint);
         const d = await r.json();
+        const elapsed = Date.now() - t0;
+        updateDebugResponse(d, r.status, elapsed);
+        
         if (d.options && d.options.length) renderScopeOptions(d.options, 'Switch to a different topic:');
         else addBot("No scopes available.");
-      } catch (e) { addBot("Error loading scopes: " + e.message) }
+      } catch (e) { 
+        addBot("Error loading scopes: " + e.message);
+        updateDebugResponse({ error: e.message }, 0, Date.now() - t0);
+      }
     }
 
     function addUser(text) {
@@ -1111,9 +1531,22 @@
       S.sending = true; inp.value = ''; document.getElementById('sendbtn').disabled = true;
       addUser(text); addStatus('Thinking...'); const t0 = Date.now();
 
+      const requestPayload = { 
+        question: text, 
+        session_id: S.sid, 
+        customer_key: S.user.customer_key || 'demo', 
+        user_id: S.user.user_id, 
+        facility_ids: S.user.facility_ids || [], 
+        role: S.user.role || 'officer' 
+      };
+      
+      // Update debug request panel
+      updateDebugRequest('/chat/stream', 'POST', requestPayload);
+
       try {
-        const r = await fetch(API + '/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, session_id: S.sid, customer_key: S.user.customer_key || 'demo', user_id: S.user.user_id, facility_ids: S.user.facility_ids || [], role: S.user.role || 'officer' }) });
+        const r = await fetch(API + '/chat/stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestPayload) });
         const rd = r.body.getReader(); const dec = new TextDecoder(); let buf = '', result = null, evtName = '';
+        let allEvents = [];
         while (true) {
           const { value, done } = await rd.read(); if (done) break;
           buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop();
@@ -1121,10 +1554,20 @@
             if (l.startsWith('event:')) evtName = l.slice(6).trim();
             if (l.startsWith('data:')) {
               const d = l.slice(5).trim(); if (!d) continue;
+              allEvents.push({ event: evtName, data: d });
               if (evtName === 'status') updStatus(d);
               else if (evtName === 'result') { try { result = JSON.parse(d) } catch { } }
               else if (evtName === 'error') { rmStatus(); addBot('Sorry, something went wrong. ' + d) }
-              else if (evtName === 'session') { try { const s = JSON.parse(d); if (s.session_id) S.sid = s.session_id } catch { } }
+              else if (evtName === 'session') { 
+                try { 
+                  const s = JSON.parse(d); 
+                  if (s.session_id) { 
+                    S.sid = s.session_id;
+                    document.getElementById('ds').textContent = S.sid.slice(0, 12) + '…';
+                    document.getElementById('csl').textContent = 'Session: ' + S.sid.slice(0, 8) + '…';
+                  }
+                } catch { } 
+              }
               else if (evtName === 'scope_options') {
                 try {
                   const opts = JSON.parse(d);
@@ -1136,6 +1579,11 @@
           }
         }
         rmStatus(); const elapsed = Date.now() - t0;
+        
+        // Update debug response panel
+        const responseData = result || { events: allEvents };
+        updateDebugResponse(responseData, r.status, elapsed);
+        
         if (result) {
           // Handle V2 scope responses
           if (result.requires_scope && result.options) {
@@ -1149,7 +1597,11 @@
           }
           if (!result.is_conversational && !result.requires_scope) { updStats(elapsed); addLog(text, true, elapsed) }
         }
-      } catch (e) { rmStatus(); addBot('Connection error. Please try again.') }
+      } catch (e) { 
+        rmStatus(); 
+        addBot('Connection error. Please try again.'); 
+        updateDebugResponse({ error: e.message }, 0, Date.now() - t0);
+      }
       S.sending = false; document.getElementById('sendbtn').disabled = false; document.getElementById('cinput').focus();
     }
 
@@ -1169,6 +1621,66 @@
     function stopMic() {
       isRecording = false; document.getElementById('micbtn').classList.remove('recording');
       if (recognition) { try { recognition.stop() } catch { } }
+    }
+
+    /* ── Debug Panels ── */
+    function toggleDebug(panel) {
+      const header = document.querySelector(`#${panel}-body`).previousElementSibling;
+      const body = document.getElementById(`${panel}-body`);
+      header.classList.toggle('expanded');
+      body.classList.toggle('collapsed');
+    }
+
+    function clearDebugPanels() {
+      document.getElementById('req-body').innerHTML = '<div class="debug-empty">Send a message to see the request</div>';
+      document.getElementById('res-body').innerHTML = '<div class="debug-empty">Response will appear here</div>';
+      document.getElementById('req-endpoint').textContent = '—';
+      document.getElementById('req-method').style.display = 'none';
+      document.getElementById('res-status').textContent = '—';
+      document.getElementById('res-time').textContent = '—';
+      document.getElementById('res-badge').className = 'badge res';
+    }
+
+    function syntaxHighlight(json) {
+      if (typeof json !== 'string') json = JSON.stringify(json, null, 2);
+      json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key';
+          } else {
+            cls = 'json-string';
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+          cls = 'json-null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+      });
+    }
+
+    function updateDebugRequest(endpoint, method, payload) {
+      document.getElementById('req-endpoint').textContent = endpoint;
+      document.getElementById('req-method').textContent = method;
+      document.getElementById('req-method').className = 'endpoint-badge ' + method.toLowerCase();
+      document.getElementById('req-method').style.display = 'inline';
+      document.getElementById('req-body').innerHTML = syntaxHighlight(payload);
+    }
+
+    function updateDebugResponse(data, status, timeMs) {
+      const badge = document.getElementById('res-badge');
+      if (status >= 200 && status < 300) {
+        badge.className = 'badge res';
+        badge.textContent = 'RESPONSE';
+      } else {
+        badge.className = 'badge err';
+        badge.textContent = 'ERROR';
+      }
+      document.getElementById('res-status').textContent = `Status: ${status}`;
+      document.getElementById('res-time').textContent = `${timeMs}ms`;
+      document.getElementById('res-body').innerHTML = syntaxHighlight(data);
     }
 
     /* ── Helpers ── */

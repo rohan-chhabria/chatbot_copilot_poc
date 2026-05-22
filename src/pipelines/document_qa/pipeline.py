@@ -45,8 +45,20 @@ class DocumentQAPipeline(Pipeline):
 
     def __init__(self):
         self._stores: dict[str, TenantDocumentStore] = {}
-        self._retriever = DocumentRetriever()
-        self._synthesizer = ResponseSynthesizer()
+        self._retrievers: dict[str, DocumentRetriever] = {}
+        self._synthesizers: dict[str, ResponseSynthesizer] = {}
+
+    def _get_retriever(self, customer_key: str) -> DocumentRetriever:
+        """Get or create customer-specific retriever with API keys."""
+        if customer_key not in self._retrievers:
+            self._retrievers[customer_key] = DocumentRetriever(customer_key)
+        return self._retrievers[customer_key]
+
+    def _get_synthesizer(self, customer_key: str) -> ResponseSynthesizer:
+        """Get or create customer-specific synthesizer with API keys."""
+        if customer_key not in self._synthesizers:
+            self._synthesizers[customer_key] = ResponseSynthesizer(customer_key)
+        return self._synthesizers[customer_key]
 
     def _get_store(self, customer_key: str) -> TenantDocumentStore:
         """Get or create tenant-specific document store."""
@@ -86,7 +98,8 @@ class DocumentQAPipeline(Pipeline):
 
         # Retrieve relevant chunks
         logger.debug("Starting retrieval...")
-        chunks = await self._retriever.retrieve(
+        retriever = self._get_retriever(session.customer_key)
+        chunks = await retriever.retrieve(
             question=question,
             store=store,
             context=scope_context,
@@ -106,7 +119,8 @@ class DocumentQAPipeline(Pipeline):
 
         # Synthesize response
         logger.debug("Starting synthesis with %d chunks...", len(chunks))
-        response = await self._synthesizer.synthesize(
+        synthesizer = self._get_synthesizer(session.customer_key)
+        response = await synthesizer.synthesize(
             question=question,
             chunks=chunks,
         )
@@ -150,7 +164,8 @@ class DocumentQAPipeline(Pipeline):
             return
 
         logger.debug("Starting retrieval...")
-        chunks = await self._retriever.retrieve(
+        retriever = self._get_retriever(session.customer_key)
+        chunks = await retriever.retrieve(
             question=question,
             store=store,
             context=scope_context,
@@ -174,7 +189,8 @@ class DocumentQAPipeline(Pipeline):
         }
 
         logger.debug("Starting stream synthesis...")
-        async for event in self._synthesizer.synthesize_stream(question, chunks):
+        synthesizer = self._get_synthesizer(session.customer_key)
+        async for event in synthesizer.synthesize_stream(question, chunks):
             yield event
 
         logger.debug("Stream synthesis complete")

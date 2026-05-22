@@ -21,6 +21,7 @@ from openai import AsyncOpenAI
 from src.pipelines.inmate_data.insight_extractor import QueryInsights
 from src.shared.config import LLM_TEMPERATURE, OPENAI_API_KEY, OPENAI_MODEL
 from src.shared.logger import get_logger
+from src.tenant.customer_config import get_customer_config
 
 logger = get_logger(__name__)
 
@@ -50,9 +51,12 @@ class ResponseSummarizer:
     a conversational summary suitable for chat interface.
     """
 
-    def __init__(self):
-        self._openai = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        self._model = OPENAI_MODEL
+    def __init__(self, customer_key: str | None = None):
+        config = get_customer_config(customer_key) if customer_key else {}
+        api_key = config.get("openai_api_key") or OPENAI_API_KEY
+        model = config.get("llm_model") or OPENAI_MODEL
+        self._openai = AsyncOpenAI(api_key=api_key)
+        self._model = model
 
     async def summarize(
         self,

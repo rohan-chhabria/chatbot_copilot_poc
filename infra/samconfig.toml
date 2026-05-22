@@ -4,9 +4,9 @@ version = 0.1
 # DEV ENVIRONMENT — Auto-deploy on push to develop branch
 # =============================================================================
 [dev.deploy.parameters]
-stack_name = "InmateCopilot-dev"
+stack_name = "SARAH-ChatBot-dev"
 resolve_s3 = true
-s3_prefix = "inmate-copilot-sam-dev"
+s3_prefix = "sarah-chatbot-sam-dev"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = false
@@ -16,7 +16,7 @@ parameter_overrides = [
     "VpcId=vpc-0a4ecb80e63042970",
     "PublicSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
     "PrivateSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
-    "RedisNodeType=cache.t4g.micro",
+    "ValkeyNodeType=cache.t4g.micro",
     "AllowedOrigins=*",
 ]
 
@@ -29,24 +29,23 @@ template_file = "template.yaml"
 
 
 # =============================================================================
-# STAGING ENVIRONMENT
+# STAGING ENVIRONMENT — Auto-deploy on push to staging branch
 # =============================================================================
 [staging.deploy.parameters]
-stack_name = "InmateCopilot-staging"
+stack_name = "SARAH-ChatBot-staging"
 resolve_s3 = true
-s3_prefix = "inmate-copilot-sam-staging"
+s3_prefix = "sarah-chatbot-sam-staging"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = false
 fail_on_empty_changeset = false
 parameter_overrides = [
     "Environment=staging",
-    "VpcId=vpc-REPLACE_WITH_YOUR_VPC",
-    "PublicSubnets=subnet-PUBLIC1,subnet-PUBLIC2",
-    "PrivateSubnets=subnet-PRIVATE1,subnet-PRIVATE2",
-    "RedisNodeType=cache.t4g.small",
-    "SentryDsn=YOUR_SENTRY_DSN",
-    "AllowedOrigins=https://staging.yourdomain.com",
+    "VpcId=vpc-0a4ecb80e63042970",
+    "PublicSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
+    "PrivateSubnets=subnet-003339d87c6ea3eb1,subnet-0eb3e2c5f3ca00b0a",
+    "ValkeyNodeType=cache.t4g.small",
+    "AllowedOrigins=*",
 ]
 
 [staging.validate.parameters]
@@ -61,9 +60,9 @@ template_file = "template.yaml"
 # PRODUCTION ENVIRONMENT — Manual approval required in GitHub
 # =============================================================================
 [prod.deploy.parameters]
-stack_name = "InmateCopilot-prod"
+stack_name = "SARAH-ChatBot-prod"
 resolve_s3 = true
-s3_prefix = "inmate-copilot-sam-prod"
+s3_prefix = "sarah-chatbot-sam-prod"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 confirm_changeset = false
@@ -73,7 +72,7 @@ parameter_overrides = [
     "VpcId=vpc-REPLACE_WITH_YOUR_VPC",
     "PublicSubnets=subnet-PUBLIC1,subnet-PUBLIC2",
     "PrivateSubnets=subnet-PRIVATE1,subnet-PRIVATE2",
-    "RedisNodeType=cache.t4g.medium",
+    "ValkeyNodeType=cache.t4g.medium",
     "CertificateArn=arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT_ID",
     "SentryDsn=YOUR_SENTRY_DSN",
     "AllowedOrigins=https://yourdomain.com",

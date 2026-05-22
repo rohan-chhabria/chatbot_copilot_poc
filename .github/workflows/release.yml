@@ -21,6 +21,9 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
   # ---------------------------------------------------------------------------
   # Prepare: Parse environments input
@@ -93,7 +96,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -107,23 +110,17 @@ jobs:
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR Repository (if not exists)
-        id: create-ecr
+      - name: Get ECR URI
+        id: ecr-uri
         run: |
-          REPO_NAME="inmate-copilot-${{ matrix.environment }}"
+          REPO_NAME="sarah-chatbot-${{ matrix.environment }}"
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGION="${{ secrets.AWS_REGION || 'us-east-1' }}"
-          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}"
-
-          aws ecr describe-repositories --repository-names $REPO_NAME 2>/dev/null || \
-            aws ecr create-repository --repository-name $REPO_NAME --image-scanning-configuration scanOnPush=true
-
+          ECR_URI="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${REPO_NAME}"
           echo "ecr_uri=${ECR_URI}" >> $GITHUB_OUTPUT
-          echo "repo_name=${REPO_NAME}" >> $GITHUB_OUTPUT
 
       - name: Build & Push Docker Image
         run: |
-          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          ECR_URI="${{ steps.ecr-uri.outputs.ecr_uri }}"
           docker build -t $ECR_URI:${{ github.sha }} -t $ECR_URI:latest -f dockerfile .
           docker push $ECR_URI:${{ github.sha }}
           docker push $ECR_URI:latest
@@ -135,25 +132,36 @@ jobs:
       - name: SAM Deploy
         working-directory: infra
         run: |
-          ECR_URI="${{ steps.create-ecr.outputs.ecr_uri }}"
+          ECR_URI="${{ steps.ecr-uri.outputs.ecr_uri }}"
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --config-env ${{ matrix.environment }} \
-            --image-repository $ECR_URI \
             --parameter-overrides "ContainerImage=$ECR_URI:${{ github.sha }}"
 
       - name: Wait for ECS Service
         run: |
           echo "Waiting for ECS service to stabilize..."
           aws ecs wait services-stable \
-            --cluster InmateCopilot-${{ matrix.environment }} \
-            --services InmateCopilot-${{ matrix.environment }} || echo "Service may still be starting"
+            --cluster SARAH-ChatBot-${{ matrix.environment }} \
+            --services SARAH-ChatBot-${{ matrix.environment }} || echo "Service may still be starting"
+
+      - name: Get API URL
+        id: api
+        run: |
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name SARAH-ChatBot-${{ matrix.environment }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
+            --output text)
+          echo "api_url=${API_URL}" >> $GITHUB_OUTPUT
 
       - name: Summary
         run: |
           echo "## ✅ Released to ${{ matrix.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Stack: \`InmateCopilot-${{ matrix.environment }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: \`${{ steps.create-ecr.outputs.ecr_uri }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- AWS Account: $(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Stack | \`SARAH-ChatBot-${{ matrix.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| API URL | ${{ steps.api.outputs.api_url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ steps.ecr-uri.outputs.ecr_uri }}:${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
